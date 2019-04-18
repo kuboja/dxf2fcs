@@ -4,6 +4,8 @@ Converter for dxf to [FemCAD script](https://github.com/HiStructClient/femcad-do
 
 You can run the tool from command line with this command: (You must be in the folder with .exe file)
 
-> dxf2fcs c:\dxf\plan.dxf
+```
+dxf2fcs c:\dxf\plan.dxf
+```
 
 Fcs file will be created and saved to the same folder.
