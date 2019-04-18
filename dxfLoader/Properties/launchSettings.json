@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "dxfLoader": {
+      "commandName": "Project",
+      "commandLineArgs": "\\\\nas\\web\\threejs\\cars\\dwg\\plan3d.dxf"
+    }
+  }
+}
