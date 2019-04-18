@@ -9,12 +9,14 @@ namespace dxf2fcs
 {
     public class DxfLoader
     {
-        const double unit = 0.001;
+        private const double unit = 0.001;
+        private bool oldVertex = false;
+        private int precision = 5;
 
-        StringBuilder sb;
-        int i;
-        Matrix3 trans;
-        Vector3 translation;
+        private StringBuilder sb;
+        private int i;
+        private Matrix3 trans;
+        private Vector3 translation;
 
         public string ToFcs(string dxfFilePath)
         {
@@ -22,6 +24,9 @@ namespace dxf2fcs
 
             sb = new StringBuilder();
             i = 0;
+
+            sb.AppendLine("cv = ar => ar.Select(v => { Vertex = Fcs.Geometry.Vertex3D(v[0], v[1], v[2]), Radius = 0 } )");
+            sb.AppendLine("v = x,y,z => Fcs.Geometry.Vertex3D(x,y,z)");
 
             foreach (var insert in doc.Inserts)
             {
@@ -33,7 +38,7 @@ namespace dxf2fcs
 
             trans = Matrix3.Identity;
             translation = Vector3.Zero;
-          
+
             EntitiesToFcs(doc.Lines);
             EntitiesToFcs(doc.Arcs);
             EntitiesToFcs(doc.Circles);
@@ -97,13 +102,13 @@ namespace dxf2fcs
             var C = (elipseLines[1] as Line).StartPoint;
             var D = (elipseLines[3] as Line).StartPoint;
 
-            sb.AppendLine($"v_{i}_a = {Vector3ToFcsVertex3D(A)}");
-            sb.AppendLine($"v_{i}_b = {Vector3ToFcsVertex3D(B)}");
-            sb.AppendLine($"v_{i}_c = {Vector3ToFcsVertex3D(C)}");
-            sb.AppendLine($"v_{i}_d = {Vector3ToFcsVertex3D(D)}");
+            sb.AppendLine(Vector3ToFcsVertex($"v{i}a", A));
+            sb.AppendLine(Vector3ToFcsVertex($"v{i}b", B));
+            sb.AppendLine(Vector3ToFcsVertex($"v{i}c", C));
+            sb.AppendLine(Vector3ToFcsVertex($"v{i}d", D));
 
-            sb.AppendLine($"curve {{c_{i}_a}} arc vertex {{v_{i}_a}} {{v_{i}_c}} {{v_{i}_b}} ");
-            sb.AppendLine($"curve {{c_{i}_b}} arc vertex {{v_{i}_b}} {{v_{i}_d}} {{v_{i}_a}} ");
+            sb.AppendLine($"curve {{c{i}a}} arc vertex v{i}a v{i}c v{i}b ");
+            sb.AppendLine($"curve {{c{i}b}} arc vertex v{i}b v{i}d v{i}a ");
         }
 
         private void DrawCircle(Circle c)
@@ -115,13 +120,13 @@ namespace dxf2fcs
             var C = (circleLines[1] as Line).StartPoint;
             var D = (circleLines[3] as Line).StartPoint;
 
-            sb.AppendLine($"v_{i}_a = {Vector3ToFcsVertex3D(A)}");
-            sb.AppendLine($"v_{i}_b = {Vector3ToFcsVertex3D(B)}");
-            sb.AppendLine($"v_{i}_c = {Vector3ToFcsVertex3D(C)}");
-            sb.AppendLine($"v_{i}_d = {Vector3ToFcsVertex3D(D)}");
+            sb.AppendLine(Vector3ToFcsVertex($"v{i}a", A));
+            sb.AppendLine(Vector3ToFcsVertex($"v{i}b", B));
+            sb.AppendLine(Vector3ToFcsVertex($"v{i}c", C));
+            sb.AppendLine(Vector3ToFcsVertex($"v{i}d", D));
 
-            sb.AppendLine($"curve {{c_{i}_a}} arc vertex {{v_{i}_a}} {{v_{i}_c}} {{v_{i}_b}} ");
-            sb.AppendLine($"curve {{c_{i}_b}} arc vertex {{v_{i}_b}} {{v_{i}_d}} {{v_{i}_a}} ");
+            sb.AppendLine($"curve {{c{i}a}} arc vertex v{i}a v{i}c v{i}b ");
+            sb.AppendLine($"curve {{c{i}b}} arc vertex v{i}b v{i}d v{i}a ");
         }
 
         private void DrawArc(Arc a)
@@ -132,39 +137,43 @@ namespace dxf2fcs
             var B = (explodedEntities[1] as Line).EndPoint;
             var C = (explodedEntities[1] as Line).StartPoint;
 
-            sb.AppendLine($"v_{i}_a = {Vector3ToFcsVertex3D(A)}");
-            sb.AppendLine($"v_{i}_b = {Vector3ToFcsVertex3D(B)}");
-            sb.AppendLine($"v_{i}_c = {Vector3ToFcsVertex3D(C)}");
+            sb.AppendLine(Vector3ToFcsVertex($"v{i}a", A));
+            sb.AppendLine(Vector3ToFcsVertex($"v{i}b", B));
+            sb.AppendLine(Vector3ToFcsVertex($"v{i}c", C));
 
-            sb.AppendLine($"curve {{c_{i}}} arc vertex {{v_{i}_a}} {{v_{i}_c}} {{v_{i}_b}} ");
+            sb.AppendLine($"curve {{c{i}}} arc vertex v{i}a v{i}c v{i}b");
         }
 
         private void DrawSpline(Spline l)
         {
-            sb.AppendLine($"vs_{i} = [");
+            sb.AppendLine($"vs{i} = [");
             sb.AppendJoin(",\n", l.ControlPoints.Select(v => Vector3ToFcsArray(trans * v.Position + translation)));
-            sb.AppendLine($"].Select(v => {{ Vertex = Fcs.Geometry.Vertex3D(v[0], v[1], v[2]), Radius = 0 }} )");
+            sb.AppendLine($"]");
 
-            sb.AppendLine($"curve {{c_{i}}} filletedpoly items (vs_{i}) radiusmultiplier 0");
+            sb.AppendLine($"curve {{c{i}}} filletedpoly items (cv(vs{i}))");
         }
 
         private void DrawLine(Line l)
         {
-            sb.AppendLine($"v_{i}_a = {Vector3ToFcsVertex3D(l.StartPoint)}");
-            sb.AppendLine($"v_{i}_b = {Vector3ToFcsVertex3D(l.EndPoint)}");
+            sb.AppendLine(Vector3ToFcsVertex($"v{i}a", l.StartPoint));
+            sb.AppendLine(Vector3ToFcsVertex($"v{i}b", l.EndPoint));
 
-            sb.AppendLine($"curve {{c_{i}}} vertex {{v_{i}_a}} {{v_{i}_b}} ");
+            sb.AppendLine($"curve {{c{i}}} vertex v{i}a v{i}b");
         }
 
-        private string Vector3ToFcsVertex3D(Vector3 vLocal)
+        private string Vector3ToFcsVertex(string name, Vector3 vLocal)
         {
-            var v = Transform(vLocal);
-            return $"Fcs.Geometry.Vertex3D({v.X * unit},{v.Y * unit},{v.Z * unit})";
+            var v = Transform(vLocal) * unit;
+            if (oldVertex)
+                return $"vertex {{{name}}} xyz {Math.Round(v.X, precision)} {Math.Round(v.Y, precision)} {Math.Round(v.Z, precision)}";
+            else
+                return $"{name} = v({Math.Round(v.X, precision)},{Math.Round(v.Y, precision)},{Math.Round(v.Z, precision)})";
         }
         private string Vector3ToFcsArray(Vector3 vLocal)
         {
-            var v = Transform(vLocal);
-            return $"[{v.X * unit},{v.Y * unit},{v.Z * unit}]";
+            var v = Transform(vLocal) * unit;
+            
+            return $"[{Math.Round(v.X,precision)},{Math.Round(v.Y, precision)},{Math.Round(v.Z,precision)}]";
         }
 
         private Vector3 Transform(Vector3 point)
