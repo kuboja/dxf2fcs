@@ -1,36 +1,53 @@
-﻿using System;
+﻿using CommandLine;
+using System;
 using System.IO;
 
 namespace dxf2fcs
 {
-    class Program
+    public class Program
     {
         static void Main(string[] args)
         {
-            if (args == null || args.Length == 0 || string.IsNullOrWhiteSpace(args[0]))
+            var parser = new Parser(with =>
             {
-                Console.WriteLine("Missing argument: path to dxf file!");
+                with.CaseInsensitiveEnumValues = false;
+                with.CaseSensitive = false;
+            });
+
+            var arguments = parser.ParseArguments<ProgramOptions>(args);
+
+            if (!(arguments is Parsed<ProgramOptions> options))
+            {
                 return;
             }
 
-            var dxfFilePath = args[0];
+            var dxfFilePath = options.Value.DxfPath;
 
             if (!new FileInfo(dxfFilePath).Exists)
             {
-                Console.WriteLine("The dxf file does not exist!");
+                Console.WriteLine("Error: The dxf file does not exist!");
                 return;
             }
 
-            var fcsFilePath = args.Length > 1
-                ? args[1]
+            var fcsFilePath = !string.IsNullOrWhiteSpace(options.Value.FcsFile)
+                ? options.Value.FcsFile
                 : dxfFilePath.Replace(".dxf", ".fcs", true, System.Globalization.CultureInfo.CurrentCulture);
 
-            var loader = new DxfLoader();
-            var fcs = loader.ToFcs(dxfFilePath);
-
-            using (var sw = new StreamWriter(fcsFilePath))
+            try
             {
-                sw.Write(fcs);
+                var loader = new DxfLoader(options.Value.Unit, options.Value.Precision);
+                var fcs = loader.ToFcs(dxfFilePath);
+
+                using (var sw = new StreamWriter(fcsFilePath))
+                {
+                    sw.Write(fcs);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error while parse dxf and creating fcs:");
+                Console.WriteLine(ex.Message);
+                return;
             }
 
             //Console.WriteLine(sb);

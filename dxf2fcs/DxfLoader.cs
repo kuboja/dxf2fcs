@@ -9,14 +9,30 @@ namespace dxf2fcs
 {
     public class DxfLoader
     {
-        private const double unit = 0.001;
-        private bool oldVertex = false;
-        private int precision = 5;
+        private readonly double unit = 0.001;
+        private readonly int precision = 5;
+        private readonly bool oldVertex = false;
 
         private StringBuilder sb;
         private int i;
         private Matrix3 trans;
         private Vector3 translation;
+
+        public DxfLoader(Units unit, int precision)
+        {
+            switch (unit)
+            {
+                case Units.mm:
+                    this.unit = 0.0001;
+                    break;
+                case Units.m:
+                    this.unit = 1.0;
+                    break;
+                default:
+                    break;
+            }
+            this.precision = precision;
+        }
 
         public string ToFcs(string dxfFilePath)
         {
