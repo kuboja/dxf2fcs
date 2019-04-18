@@ -9,11 +9,17 @@ namespace dxf2fcs
         {
             if (args == null || args.Length == 0 || string.IsNullOrWhiteSpace(args[0]))
             {
-                Console.WriteLine("Missing argument: path to dxf file");
+                Console.WriteLine("Missing argument: path to dxf file!");
                 return;
             }
 
             var dxfFilePath = args[0];
+
+            if (!new FileInfo(dxfFilePath).Exists)
+            {
+                Console.WriteLine("The dxf file does not exist!");
+                return;
+            }
 
             var fcsFilePath = args.Length > 1
                 ? args[1]
