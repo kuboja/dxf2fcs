@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace dxfLoader
+namespace dxf2fcs
 {
     public class DxfLoader
     {
@@ -63,7 +63,6 @@ namespace dxfLoader
                     }
                 }
             }
-
         }
 
         private void DrawElipse(Ellipse e)
@@ -75,10 +74,10 @@ namespace dxfLoader
             var C = (elipseLines[1] as Line).StartPoint;
             var D = (elipseLines[3] as Line).StartPoint;
 
-            sb.AppendLine($"v_{i}_a = {Vector3ToFcsVertex3D( A )}");
-            sb.AppendLine($"v_{i}_b = {Vector3ToFcsVertex3D( B )}");
-            sb.AppendLine($"v_{i}_c = {Vector3ToFcsVertex3D( C )}");
-            sb.AppendLine($"v_{i}_d = {Vector3ToFcsVertex3D( D )}");
+            sb.AppendLine($"v_{i}_a = {Vector3ToFcsVertex3D(A)}");
+            sb.AppendLine($"v_{i}_b = {Vector3ToFcsVertex3D(B)}");
+            sb.AppendLine($"v_{i}_c = {Vector3ToFcsVertex3D(C)}");
+            sb.AppendLine($"v_{i}_d = {Vector3ToFcsVertex3D(D)}");
 
             sb.AppendLine($"curve {{c_{i}_a}} arc vertex {{v_{i}_a}} {{v_{i}_c}} {{v_{i}_b}} ");
             sb.AppendLine($"curve {{c_{i}_b}} arc vertex {{v_{i}_b}} {{v_{i}_d}} {{v_{i}_a}} ");
@@ -93,10 +92,10 @@ namespace dxfLoader
             var C = (circleLines[1] as Line).StartPoint;
             var D = (circleLines[3] as Line).StartPoint;
 
-            sb.AppendLine($"v_{i}_a = {Vector3ToFcsVertex3D( A )}");
-            sb.AppendLine($"v_{i}_b = {Vector3ToFcsVertex3D( B )}");
-            sb.AppendLine($"v_{i}_c = {Vector3ToFcsVertex3D( C )}");
-            sb.AppendLine($"v_{i}_d = {Vector3ToFcsVertex3D( D )}");
+            sb.AppendLine($"v_{i}_a = {Vector3ToFcsVertex3D(A)}");
+            sb.AppendLine($"v_{i}_b = {Vector3ToFcsVertex3D(B)}");
+            sb.AppendLine($"v_{i}_c = {Vector3ToFcsVertex3D(C)}");
+            sb.AppendLine($"v_{i}_d = {Vector3ToFcsVertex3D(D)}");
 
             sb.AppendLine($"curve {{c_{i}_a}} arc vertex {{v_{i}_a}} {{v_{i}_c}} {{v_{i}_b}} ");
             sb.AppendLine($"curve {{c_{i}_b}} arc vertex {{v_{i}_b}} {{v_{i}_d}} {{v_{i}_a}} ");
@@ -110,8 +109,8 @@ namespace dxfLoader
             var B = (explodedEntities[1] as Line).EndPoint;
             var C = (explodedEntities[1] as Line).StartPoint;
 
-            sb.AppendLine($"v_{i}_a = {Vector3ToFcsVertex3D( A )}");
-            sb.AppendLine($"v_{i}_b = {Vector3ToFcsVertex3D(B )}");
+            sb.AppendLine($"v_{i}_a = {Vector3ToFcsVertex3D(A)}");
+            sb.AppendLine($"v_{i}_b = {Vector3ToFcsVertex3D(B)}");
             sb.AppendLine($"v_{i}_c = {Vector3ToFcsVertex3D(C)}");
 
             sb.AppendLine($"curve {{c_{i}}} arc vertex {{v_{i}_a}} {{v_{i}_c}} {{v_{i}_b}} ");

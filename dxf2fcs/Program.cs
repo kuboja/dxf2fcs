@@ -1,12 +1,10 @@
 ﻿using System;
 using System.IO;
 
-namespace dxfLoader
+namespace dxf2fcs
 {
     class Program
     {
-        
-
         static void Main(string[] args)
         {
             if (args == null || args.Length == 0 || string.IsNullOrWhiteSpace(args[0]))
@@ -29,7 +27,5 @@ namespace dxfLoader
             //Console.WriteLine(sb);
             Console.WriteLine("Done.");
         }
-
-        
     }
 }
