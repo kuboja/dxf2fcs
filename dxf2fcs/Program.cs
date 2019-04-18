@@ -14,7 +14,10 @@ namespace dxf2fcs
             }
 
             var dxfFilePath = args[0];
-            var fcsFilePath = dxfFilePath.Replace(".dxf", ".fcs", true, System.Globalization.CultureInfo.CurrentCulture);
+
+            var fcsFilePath = args.Length > 1
+                ? args[1]
+                : dxfFilePath.Replace(".dxf", ".fcs", true, System.Globalization.CultureInfo.CurrentCulture);
 
             var loader = new DxfLoader();
             var fcs = loader.ToFcs(dxfFilePath);
