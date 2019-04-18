@@ -31,6 +31,29 @@ namespace dxf2fcs
                 EntitiesToFcs(block.Entities);
             }
 
+            trans = Matrix3.Identity;
+            translation = Vector3.Zero;
+          
+            EntitiesToFcs(doc.Lines);
+            EntitiesToFcs(doc.Arcs);
+            EntitiesToFcs(doc.Circles);
+            EntitiesToFcs(doc.Ellipses);
+            EntitiesToFcs(doc.Points);
+            EntitiesToFcs(doc.Splines);
+            EntitiesToFcs(doc.Traces);
+            EntitiesToFcs(doc.Texts);
+            EntitiesToFcs(doc.Solids);
+            EntitiesToFcs(doc.Shapes);
+            EntitiesToFcs(doc.Polylines);
+            EntitiesToFcs(doc.PolyfaceMeshes);
+            EntitiesToFcs(doc.Meshes);
+            EntitiesToFcs(doc.MTexts);
+            EntitiesToFcs(doc.MLines);
+            EntitiesToFcs(doc.LwPolylines);
+            EntitiesToFcs(doc.Faces3d);
+            EntitiesToFcs(doc.Images);
+            //EntitiesToFcs(doc.Groups);
+
             return sb.ToString();
         }
 
