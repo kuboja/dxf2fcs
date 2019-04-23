@@ -9,3 +9,30 @@ dxf2fcs c:\dxf\plan.dxf
 ```
 
 Fcs file will be created and saved to the same folder.
+
+## Command line parameters
+
+### Precision
+
+Default precision is 5 decimal places (0.1 mm). For change you can use `-p number` command line parameter:
+
+```
+dxf2fcs c:\dxf\plan.dxf -p 6
+```
+
+### Dxf unit
+Unit is used for size transformation from dxf unit to femcad unit (m). Supported units are:
+- mm (0.001, default)
+- m (1.0).
+
+Use `-u [mm|m]` parameter for change unit:
+
+```
+dxf2fcs c:\dxf\plan.dxf -u m
+```
+
+### Output file
+You can define the output file path with `-o fullpath` parameter:
+```
+dxf2fcs c:\dxf\plan.dxf -o c:\fcs\plan.fcs
+```
