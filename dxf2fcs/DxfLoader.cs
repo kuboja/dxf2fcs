@@ -11,6 +11,7 @@ namespace dxf2fcs
     {
         private readonly double unit = 0.001;
         private readonly int precision = 5;
+        private readonly string numFormat = "{0:0.#####}";
         private readonly bool oldVertex = false;
 
         private StringBuilder sb;
@@ -32,6 +33,7 @@ namespace dxf2fcs
                     break;
             }
             this.precision = precision;
+            numFormat = "{0:0." + new string('#', precision) + "}";
         }
 
         public string ToFcs(string dxfFilePath)
@@ -213,7 +215,7 @@ namespace dxf2fcs
 
         private void AppendNumber(double value)
         {
-            sb.Append(Math.Round(value, precision)) ;
+            sb.AppendFormat(numFormat, Math.Round(value, precision));
         }
 
         private Vector3 Transform(Vector3 point)
