@@ -118,10 +118,10 @@ namespace dxf2fcs
             var C = (elipseLines[1] as Line).StartPoint;
             var D = (elipseLines[3] as Line).StartPoint;
 
-            sb.AppendLine(Vector3ToFcsVertex($"v{i}a", A));
-            sb.AppendLine(Vector3ToFcsVertex($"v{i}b", B));
-            sb.AppendLine(Vector3ToFcsVertex($"v{i}c", C));
-            sb.AppendLine(Vector3ToFcsVertex($"v{i}d", D));
+            AppendLineVector3ToFcsVertex($"v{i}a", A);
+            AppendLineVector3ToFcsVertex($"v{i}b", B);
+            AppendLineVector3ToFcsVertex($"v{i}c", C);
+            AppendLineVector3ToFcsVertex($"v{i}d", D);
 
             sb.AppendLine($"curve {{c{i}a}} arc vertex v{i}a v{i}c v{i}b ");
             sb.AppendLine($"curve {{c{i}b}} arc vertex v{i}b v{i}d v{i}a ");
@@ -136,10 +136,10 @@ namespace dxf2fcs
             var C = (circleLines[1] as Line).StartPoint;
             var D = (circleLines[3] as Line).StartPoint;
 
-            sb.AppendLine(Vector3ToFcsVertex($"v{i}a", A));
-            sb.AppendLine(Vector3ToFcsVertex($"v{i}b", B));
-            sb.AppendLine(Vector3ToFcsVertex($"v{i}c", C));
-            sb.AppendLine(Vector3ToFcsVertex($"v{i}d", D));
+            AppendLineVector3ToFcsVertex($"v{i}a", A);
+            AppendLineVector3ToFcsVertex($"v{i}b", B);
+            AppendLineVector3ToFcsVertex($"v{i}c", C);
+            AppendLineVector3ToFcsVertex($"v{i}d", D);
 
             sb.AppendLine($"curve {{c{i}a}} arc vertex v{i}a v{i}c v{i}b ");
             sb.AppendLine($"curve {{c{i}b}} arc vertex v{i}b v{i}d v{i}a ");
@@ -153,9 +153,9 @@ namespace dxf2fcs
             var B = (explodedEntities[1] as Line).EndPoint;
             var C = (explodedEntities[1] as Line).StartPoint;
 
-            sb.AppendLine(Vector3ToFcsVertex($"v{i}a", A));
-            sb.AppendLine(Vector3ToFcsVertex($"v{i}b", B));
-            sb.AppendLine(Vector3ToFcsVertex($"v{i}c", C));
+            AppendLineVector3ToFcsVertex($"v{i}a", A);
+            AppendLineVector3ToFcsVertex($"v{i}b", B);
+            AppendLineVector3ToFcsVertex($"v{i}c", C);
 
             sb.AppendLine($"curve {{c{i}}} arc vertex v{i}a v{i}c v{i}b");
         }
@@ -163,7 +163,11 @@ namespace dxf2fcs
         private void DrawSpline(Spline l)
         {
             sb.AppendLine($"vs{i} = [");
-            sb.AppendJoin(",\n", l.ControlPoints.Select(v => Vector3ToFcsArray(trans * v.Position + translation)));
+            foreach (var point in l.ControlPoints)
+            {
+                AppendVector3ToFcsArray(point.Position);
+                sb.AppendLine(",");
+            }
             sb.AppendLine($"]");
 
             sb.AppendLine($"curve {{c{i}}} filletedpoly items (cv(vs{i}))");
@@ -171,30 +175,50 @@ namespace dxf2fcs
 
         private void DrawLine(Line l)
         {
-            sb.AppendLine(Vector3ToFcsVertex($"v{i}a", l.StartPoint));
-            sb.AppendLine(Vector3ToFcsVertex($"v{i}b", l.EndPoint));
+            AppendLineVector3ToFcsVertex($"v{i}a", l.StartPoint);
+            AppendLineVector3ToFcsVertex($"v{i}b", l.EndPoint);
 
             sb.AppendLine($"curve {{c{i}}} vertex v{i}a v{i}b");
         }
 
-        private string Vector3ToFcsVertex(string name, Vector3 vLocal)
+        private void AppendLineVector3ToFcsVertex(string name, Vector3 vLocal)
         {
-            var v = Transform(vLocal) * unit;
+            var v = Transform(vLocal);
+
             if (oldVertex)
-                return $"vertex {{{name}}} xyz {Math.Round(v.X, precision)} {Math.Round(v.Y, precision)} {Math.Round(v.Z, precision)}";
+                sb.AppendLine($"vertex {{{name}}} xyz {Math.Round(v.X, precision)} {Math.Round(v.Y, precision)} {Math.Round(v.Z, precision)}");
             else
-                return $"{name} = v({Math.Round(v.X, precision)},{Math.Round(v.Y, precision)},{Math.Round(v.Z, precision)})";
+            {
+                sb.Append($"{name}=v(");
+                AppendNumber(v.X);
+                sb.Append(",");
+                AppendNumber(v.Y);
+                sb.Append(",");
+                AppendNumber(v.Z);
+                sb.AppendLine(")");
+            }
         }
-        private string Vector3ToFcsArray(Vector3 vLocal)
+        private void AppendVector3ToFcsArray(Vector3 vLocal)
         {
-            var v = Transform(vLocal) * unit;
-            
-            return $"[{Math.Round(v.X,precision)},{Math.Round(v.Y, precision)},{Math.Round(v.Z,precision)}]";
+            var v = Transform(vLocal);
+
+            sb.Append($"[");
+            AppendNumber(v.X);
+            sb.Append(",");
+            AppendNumber(v.Y);
+            sb.Append(",");
+            AppendNumber(v.Z);
+            sb.Append("]");
+        }
+
+        private void AppendNumber(double value)
+        {
+            sb.Append(Math.Round(value, precision)) ;
         }
 
         private Vector3 Transform(Vector3 point)
         {
-            return trans * point + translation;
+            return (trans * point + translation) * unit;
         }
     }
 }
