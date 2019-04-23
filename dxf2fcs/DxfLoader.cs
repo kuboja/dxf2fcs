@@ -23,7 +23,7 @@ namespace dxf2fcs
             switch (unit)
             {
                 case Units.mm:
-                    this.unit = 0.0001;
+                    this.unit = 0.001;
                     break;
                 case Units.m:
                     this.unit = 1.0;
