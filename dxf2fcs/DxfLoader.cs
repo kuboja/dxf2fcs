@@ -9,12 +9,12 @@ namespace dxf2fcs
 {
     public class DxfLoader
     {
-        private readonly double unit = 0.001;
-        private readonly int precision = 5;
-        private readonly string numFormat = "{0:0.#####}";
+        private readonly double unit;
+        private readonly int precision;
+        private readonly string numFormat;
         private readonly bool oldVertex = false;
+        private readonly StringBuilder sb;
 
-        private StringBuilder sb;
         private int i;
         private Matrix3 trans;
         private Vector3 translation;
@@ -32,15 +32,18 @@ namespace dxf2fcs
                 default:
                     break;
             }
+
             this.precision = precision;
             numFormat = "{0:0." + new string('#', precision) + "}";
+
+            sb = new StringBuilder();
         }
 
         public string ToFcs(string dxfFilePath)
         {
             var doc = DxfDocument.Load(dxfFilePath);
 
-            sb = new StringBuilder();
+            sb.Clear();
             i = 0;
 
             sb.AppendLine("cv = ar => ar.Select(v => { Vertex = Fcs.Geometry.Vertex3D(v[0], v[1], v[2]), Radius = 0 } )");
@@ -128,51 +131,60 @@ namespace dxf2fcs
         {
             var elipseLines = e.ToPolyline(4).Explode();
 
-            var A = (elipseLines[0] as Line).StartPoint;
-            var B = (elipseLines[1] as Line).EndPoint;
-            var C = (elipseLines[1] as Line).StartPoint;
-            var D = (elipseLines[3] as Line).StartPoint;
+            if (elipseLines != null && elipseLines[0] is Line la && elipseLines[2] is Line lb)
+            {
+                var A = la.StartPoint;
+                var B = lb.StartPoint;
+                var C = la.EndPoint;
+                var D = lb.EndPoint;
 
-            AppendLineVector3ToFcsVertex($"v{i}a", A);
-            AppendLineVector3ToFcsVertex($"v{i}b", B);
-            AppendLineVector3ToFcsVertex($"v{i}c", C);
-            AppendLineVector3ToFcsVertex($"v{i}d", D);
+                AppendLineVector3ToFcsVertex($"v{i}a", A);
+                AppendLineVector3ToFcsVertex($"v{i}b", B);
+                AppendLineVector3ToFcsVertex($"v{i}c", C);
+                AppendLineVector3ToFcsVertex($"v{i}d", D);
 
-            sb.AppendLine($"curve {{c{i}a}} arc vertex v{i}a v{i}c v{i}b ");
-            sb.AppendLine($"curve {{c{i}b}} arc vertex v{i}b v{i}d v{i}a ");
+                sb.AppendLine($"curve {{c{i}a}} arc vertex v{i}a v{i}c v{i}b ");
+                sb.AppendLine($"curve {{c{i}b}} arc vertex v{i}b v{i}d v{i}a ");
+            }
         }
 
         private void DrawCircle(Circle c)
         {
             var circleLines = c.ToPolyline(4).Explode();
 
-            var A = (circleLines[0] as Line).StartPoint;
-            var B = (circleLines[1] as Line).EndPoint;
-            var C = (circleLines[1] as Line).StartPoint;
-            var D = (circleLines[3] as Line).StartPoint;
+            if (circleLines != null && circleLines[0] is Line la && circleLines[2] is Line lb)
+            {
+                var A = la.StartPoint;
+                var B = lb.StartPoint;
+                var C = la.EndPoint;
+                var D = lb.EndPoint;
 
-            AppendLineVector3ToFcsVertex($"v{i}a", A);
-            AppendLineVector3ToFcsVertex($"v{i}b", B);
-            AppendLineVector3ToFcsVertex($"v{i}c", C);
-            AppendLineVector3ToFcsVertex($"v{i}d", D);
+                AppendLineVector3ToFcsVertex($"v{i}a", A);
+                AppendLineVector3ToFcsVertex($"v{i}b", B);
+                AppendLineVector3ToFcsVertex($"v{i}c", C);
+                AppendLineVector3ToFcsVertex($"v{i}d", D);
 
-            sb.AppendLine($"curve {{c{i}a}} arc vertex v{i}a v{i}c v{i}b ");
-            sb.AppendLine($"curve {{c{i}b}} arc vertex v{i}b v{i}d v{i}a ");
+                sb.AppendLine($"curve {{c{i}a}} arc vertex v{i}a v{i}c v{i}b ");
+                sb.AppendLine($"curve {{c{i}b}} arc vertex v{i}b v{i}d v{i}a ");
+            }
         }
 
         private void DrawArc(Arc a)
         {
             var explodedEntities = a.ToPolyline(2).Explode();
 
-            var A = (explodedEntities[0] as Line).StartPoint;
-            var B = (explodedEntities[1] as Line).EndPoint;
-            var C = (explodedEntities[1] as Line).StartPoint;
+            if (explodedEntities != null && explodedEntities[0] is Line la && explodedEntities[1] is Line lb)
+            {
+                var A = la.StartPoint;
+                var B = lb.EndPoint;
+                var C = lb.StartPoint;
 
-            AppendLineVector3ToFcsVertex($"v{i}a", A);
-            AppendLineVector3ToFcsVertex($"v{i}b", B);
-            AppendLineVector3ToFcsVertex($"v{i}c", C);
+                AppendLineVector3ToFcsVertex($"v{i}a", A);
+                AppendLineVector3ToFcsVertex($"v{i}b", B);
+                AppendLineVector3ToFcsVertex($"v{i}c", C);
 
-            sb.AppendLine($"curve {{c{i}}} arc vertex v{i}a v{i}c v{i}b");
+                sb.AppendLine($"curve {{c{i}}} arc vertex v{i}a v{i}c v{i}b");
+            }
         }
 
         private void DrawSpline(Spline l)

@@ -13,7 +13,7 @@ namespace dxf2fcs
         }
 
         static void MainOk(ProgramOptions options) { 
-            var dxfFilePath = options.DxfPath;
+            var dxfFilePath = options.DxfPath ?? "";
 
             if (!new FileInfo(dxfFilePath).Exists)
             {
