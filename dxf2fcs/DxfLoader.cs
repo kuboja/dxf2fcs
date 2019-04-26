@@ -164,10 +164,15 @@ namespace dxf2fcs
 
         private void DrawSpline(Spline l)
         {
+            DrawCurve(l.ControlPoints.Select(p => p.Position));
+        }
+
+        private void DrawCurve(IEnumerable<Vector3> vectors)
+        {
             sb.AppendLine($"vs{i} = [");
-            foreach (var point in l.ControlPoints)
+            foreach (var point in vectors)
             {
-                AppendVector3ToFcsArray(point.Position);
+                AppendVector3ToFcsArray(point);
                 sb.AppendLine(",");
             }
             sb.AppendLine($"]");
