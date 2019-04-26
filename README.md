@@ -10,6 +10,11 @@ dxf2fcs c:\dxf\plan.dxf
 
 Fcs file will be created and saved to the same folder.
 
+## Prerequisite
+
+You must have the **.NET Core Runtime** (v2.2) instaled on your computer. You can download it here: [https://dotnet.microsoft.com/download](https://dotnet.microsoft.com/download).
+
+
 ## Command line parameters
 
 ### Precision
