@@ -103,11 +103,24 @@ namespace dxf2fcs
                         case Ellipse e:
                             DrawElipse(e);
                             break;
+                        case Mesh m:
+                            DrawMesh(m);
+                            break;
                         default:
                             Console.WriteLine($"Nepodporovaná entita: {item.GetType()}");
                             break;
                     }
                 }
+            }
+        }
+
+        private void DrawMesh(Mesh m)
+        {
+            foreach (var item in m.Faces)
+            {
+                DrawCurve(item.Select(vi => m.Vertexes[vi]).Append(m.Vertexes[item[0]]));
+                sb.AppendLine($"area {{a{i}}} boundary curve {{c{i}}}");
+                i++;
             }
         }
 
