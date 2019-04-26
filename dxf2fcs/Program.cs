@@ -8,20 +8,12 @@ namespace dxf2fcs
     {
         static void Main(string[] args)
         {
-            var parser = new Parser(with =>
-            {
-                with.CaseInsensitiveEnumValues = false;
-                with.CaseSensitive = false;
-            });
+            Parser.Default.ParseArguments<ProgramOptions>(args)
+                .WithParsed(opts => MainOk(opts));
+        }
 
-            var arguments = parser.ParseArguments<ProgramOptions>(args);
-
-            if (!(arguments is Parsed<ProgramOptions> options))
-            {
-                return;
-            }
-
-            var dxfFilePath = options.Value.DxfPath;
+        static void MainOk(ProgramOptions options) { 
+            var dxfFilePath = options.DxfPath;
 
             if (!new FileInfo(dxfFilePath).Exists)
             {
@@ -29,13 +21,13 @@ namespace dxf2fcs
                 return;
             }
 
-            var fcsFilePath = !string.IsNullOrWhiteSpace(options.Value.FcsFile)
-                ? options.Value.FcsFile
+            var fcsFilePath = !string.IsNullOrWhiteSpace(options.FcsFile)
+                ? options.FcsFile
                 : dxfFilePath.Replace(".dxf", ".fcs", true, System.Globalization.CultureInfo.CurrentCulture);
 
             try
             {
-                var loader = new DxfLoader(options.Value.Unit, options.Value.Precision);
+                var loader = new DxfLoader(options.Unit, options.Precision);
                 var fcs = loader.ToFcs(dxfFilePath);
 
                 using (var sw = new StreamWriter(fcsFilePath))
@@ -50,7 +42,6 @@ namespace dxf2fcs
                 return;
             }
 
-            //Console.WriteLine(sb);
             Console.WriteLine("Done.");
         }
     }
