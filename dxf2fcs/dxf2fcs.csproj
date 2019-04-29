@@ -3,7 +3,9 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.2</TargetFramework>
-    <Version>1.3.0</Version>
+    <Version>1.4.0</Version>
+    <Company>FemCAD</Company>
+    <Authors>Jan Kubošek</Authors>
     <LangVersion>8.0</LangVersion>
     <NullableContextOptions>enable</NullableContextOptions>
   </PropertyGroup>
