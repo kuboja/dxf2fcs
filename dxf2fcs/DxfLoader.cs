@@ -109,12 +109,21 @@ namespace dxf2fcs
                         case Mesh m:
                             DrawMesh(m);
                             break;
+                        case LwPolyline lp:
+                            DrawPolyline(lp);
+                            break;
                         default:
                             Console.WriteLine($"Nepodporovaná entita: {item.GetType()}");
                             break;
                     }
                 }
             }
+        }
+
+        private void DrawPolyline(LwPolyline l)
+        {
+            var ex = l.Explode();
+            EntitiesToFcs(ex);
         }
 
         private void DrawMesh(Mesh m)
