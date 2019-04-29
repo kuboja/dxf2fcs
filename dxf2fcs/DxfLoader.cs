@@ -1,5 +1,6 @@
 ﻿using netDxf;
 using netDxf.Entities;
+using netDxf.Units;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,11 +15,13 @@ namespace dxf2fcs
         private readonly string numFormat;
         private readonly bool oldVertex = false;
         private readonly StringBuilder sb;
+        private readonly Stack<Matrix3> transformations;
+        private readonly Stack<Vector3> translations;
 
         private int i;
         private Matrix3 trans;
         private Vector3 translation;
-
+        
         public DxfLoader(Units unit, int precision)
         {
             switch (unit)
@@ -37,6 +40,8 @@ namespace dxf2fcs
             numFormat = "{0:0." + new string('#', precision) + "}";
 
             sb = new StringBuilder();
+            transformations = new Stack<Matrix3>();
+            translations = new Stack<Vector3>();
         }
 
         public string ToFcs(string dxfFilePath)
@@ -46,20 +51,18 @@ namespace dxf2fcs
             sb.Clear();
             i = 0;
 
-            sb.AppendLine("cv = ar => ar.Select(v => { Vertex = Fcs.Geometry.Vertex3D(v[0], v[1], v[2]), Radius = 0 } )");
-            sb.AppendLine("v = x,y,z => Fcs.Geometry.Vertex3D(x,y,z)");
-
-            foreach (var insert in doc.Inserts)
-            {
-                var block = insert.Block;
-                trans = insert.GetTransformation(netDxf.Units.DrawingUnits.Millimeters);
-                translation = insert.Position;
-                EntitiesToFcs(block.Entities);
-            }
-
             trans = Matrix3.Identity;
             translation = Vector3.Zero;
 
+            transformations.Clear();
+            transformations.Push(trans);
+            translations.Clear();
+            translations.Push(translation);
+
+            sb.AppendLine("cv = ar => ar.Select(v => { Vertex = Fcs.Geometry.Vertex3D(v[0], v[1], v[2]), Radius = 0 } )");
+            sb.AppendLine("v = x,y,z => Fcs.Geometry.Vertex3D(x,y,z)");
+
+            EntitiesToFcs(doc.Inserts);
             EntitiesToFcs(doc.Lines);
             EntitiesToFcs(doc.Arcs);
             EntitiesToFcs(doc.Circles);
@@ -112,12 +115,50 @@ namespace dxf2fcs
                         case LwPolyline lp:
                             DrawPolyline(lp);
                             break;
+                        case Insert insert:
+                            DrawInsert(insert);
+                            break;
                         default:
                             Console.WriteLine($"Nepodporovaná entita: {item.GetType()}");
                             break;
                     }
                 }
             }
+        }
+
+        private void SetNewTrans(Matrix3 tf, Vector3 tr)
+        {
+            var tra = transformations.Peek() * tf;
+            var pos = translations.Peek() + transformations.Peek() * tr;
+            transformations.Push(tra);
+            translations.Push(pos);
+
+            trans = tra;
+            translation = pos;
+        }
+
+        private void BackTrans()
+        {
+            transformations.Pop();
+            translations.Pop();
+
+            trans = transformations.Peek();
+            translation = translations.Peek();
+        }
+
+        private void DrawInsert(Insert insert)
+        {
+            var block = insert.Block;
+
+            var drawingUnit = DrawingUnits.Millimeters;
+            if (block.Owner is netDxf.Blocks.BlockRecord br)
+                drawingUnit = br.Units;
+
+            SetNewTrans(insert.GetTransformation(drawingUnit), insert.Position);
+
+            EntitiesToFcs(block.Entities);
+
+            BackTrans();
         }
 
         private void DrawPolyline(LwPolyline l)
