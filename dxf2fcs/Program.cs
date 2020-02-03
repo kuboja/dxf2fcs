@@ -8,6 +8,24 @@ namespace dxf2fcs
     {
         static void Main(string[] args)
         {
+            //var c = new Assimp.AssimpContext();
+            //
+            //Console.WriteLine("Export formats:");
+            //var fs = c.GetSupportedExportFormats();
+            //foreach (var item in fs)
+            //{
+            //    Console.WriteLine(item.FormatId + " : " + item.FileExtension + " : " + item.Description);
+            //}
+            //
+            //Console.WriteLine("\n\nImport formats:");
+            //var fis = c.GetSupportedImportFormats();
+            //foreach (var item in fis)
+            //{
+            //    Console.WriteLine(item);
+            //}
+            //
+            //Console.ReadKey();
+
             Parser.Default.ParseArguments<ProgramOptions>(args)
                 .WithParsed(opts => MainOk(opts));
         }
@@ -33,6 +51,7 @@ namespace dxf2fcs
                 using (var sw = new StreamWriter(fcsFilePath))
                 {
                     sw.Write(fcs);
+                    sw.Close();
                 }
             }
             catch (Exception ex)
