@@ -8,6 +8,18 @@ using System.Text;
 
 namespace dxf2fcs
 {
+    public class VectorRadius
+    {
+        public Vector3 Point;
+        public double Radius;
+
+        public VectorRadius(Vector3 point, double radius)
+        {
+            Point = point;
+            Radius = radius;
+        }
+    }
+
     public class DxfLoader
     {
         private readonly double unit;
@@ -18,7 +30,7 @@ namespace dxf2fcs
         private readonly Stack<Matrix3> transformations;
         private readonly Stack<Vector3> translations;
 
-        private int i;
+        private int iDrawed;
         private Matrix3 trans;
         private Vector3 translation;
         
@@ -49,7 +61,7 @@ namespace dxf2fcs
             var doc = DxfDocument.Load(dxfFilePath);
 
             sb.Clear();
-            i = 0;
+            iDrawed = 0;
 
             trans = Matrix3.Identity;
             translation = Vector3.Zero;
@@ -60,6 +72,7 @@ namespace dxf2fcs
             translations.Push(translation);
 
             sb.AppendLine("cv = ar => ar.Select(v => { Vertex = Fcs.Geometry.Vertex3D(v[0], v[1], v[2]), Radius = 0 } )");
+            sb.AppendLine("cvr = ar => ar.Select(v => { Vertex = Fcs.Geometry.Vertex3D(v[0], v[1], v[2]), Radius = v[3] } )");
             sb.AppendLine("v = x,y,z => Fcs.Geometry.Vertex3D(x,y,z)");
 
             EntitiesToFcs(doc.Inserts);
@@ -81,8 +94,8 @@ namespace dxf2fcs
             EntitiesToFcs(doc.LwPolylines);
             EntitiesToFcs(doc.Faces3d);
             EntitiesToFcs(doc.Images);
+            EntitiesToFcs(doc.Hatches);
             //EntitiesToFcs(doc.Groups);
-
             return sb.ToString();
         }
 
@@ -91,7 +104,7 @@ namespace dxf2fcs
             {
                 foreach (var item in entities)
                 {
-                    i++;
+                    iDrawed++;
                     switch (item)
                     {
                         case Line l:
@@ -117,6 +130,9 @@ namespace dxf2fcs
                             break;
                         case Insert insert:
                             DrawInsert(insert);
+                            break;
+                        case Hatch hatch:
+                            DrawHatch(hatch);
                             break;
                         default:
                             Console.WriteLine($"Nepodporovaná entita: {item.GetType()}");
@@ -161,10 +177,145 @@ namespace dxf2fcs
             BackTrans();
         }
 
+        private void DrawPolyline2(LwPolyline l)
+        {
+            var v = new List<Vector3>();
+
+            foreach (var e in l.Vertexes)
+            {
+                var p1 = MathHelper.Transform(new Vector3(e.Position.X, e.Position.Y, l.Elevation), l.Normal, CoordinateSystem.Object, CoordinateSystem.World);
+
+                v.Add(p1);
+            }
+
+            if (l.IsClosed)
+            {
+                v.Add(v[0]);
+            }
+
+            DrawCurve(v);
+        }
+
         private void DrawPolyline(LwPolyline l)
         {
             var ex = l.Explode();
-            EntitiesToFcs(ex);
+
+            var v = new List<Vector3>();
+
+            var i = 0;
+            foreach (var en in ex)
+            {
+                if (en is Line line)
+                {
+                    var A = line.StartPoint;
+                    var B = line.EndPoint;
+
+                    if (i == 0)
+                    {
+                        v.Add(A);
+                        v.Add(B);
+                    }
+                    else {
+                        var L = v[v.Count - 1];
+
+                        if (i == 1 && !L.Equals(A, Math.Pow(10, -8)) && !L.Equals(B, Math.Pow(10, -8)))
+                        {
+                            v.Reverse();
+                        }
+
+                        L = v[v.Count - 1];
+                        if (L.Equals(A, Math.Pow(10, -8)))
+                        {
+                            v.Add(B);
+                        }
+                        else
+                        {
+                            v.Add(A);
+                            v.Add(B);
+                        }
+                    }
+                    
+                }
+
+                else if (en is Arc arc)
+                {
+                    //var linesAB = arc.ToPolyline(3).Explode().Select(e => (Line)e).ToArray();
+
+                    //var A = linesAB[0].StartPoint;
+                    //var B = linesAB[2].EndPoint;
+                    //var S = (A + B) / 2;
+                    //var C = arc.Center;
+
+                    //var r = arc.Radius;
+
+                    //var U = S - C;
+                    //U.Normalize();
+
+                    //var phi = Math.Abs(arc.StartAngle - arc.EndAngle) / 2;
+                    //var d = r / Math.Cos(phi / 180 * Math.PI);
+
+                    //var X = C + d * U;
+
+
+                    var angle = Math.Abs(arc.EndAngle - arc.StartAngle);
+                    if (angle == 0) angle = 360;
+
+                    var poly = arc.ToPolyline(Math.Max(4, (int)(angle / 90 * 8))).Explode().Select(l => (Line)l).ToList();
+
+                    var A = (poly[0]).StartPoint;
+                    var B = (poly[poly.Count-1]).EndPoint;
+
+                    var reversed = false;
+
+                    if (i == 0)
+                    {
+                        v.Add(A);
+                    }
+                    else
+                    {
+                        var L = v[v.Count - 1];
+
+                        if (i == 1 && !L.Equals(A, Math.Pow(10, -8)) && !L.Equals(B, Math.Pow(10, -8)))
+                        {
+                            v.Reverse();
+                        }
+
+                        L = v[v.Count - 1];
+                        if (!L.Equals(A, Math.Pow(10, -8)))
+                        {
+                            poly.Reverse();
+                            reversed = true;
+                        }
+                    }
+
+                  //  A = ((Line)poly[0]).StartPoint;
+                  //  v.Add(A);
+
+                    foreach (var arcLine in poly)
+                    {
+                        if (arcLine is Line cl)
+                            v.Add(reversed ? cl.StartPoint : cl.EndPoint);
+                        else
+                        {
+                            Console.WriteLine("eroro");
+                        }
+                    }
+                }
+
+                i++;
+            }
+
+            if (l.IsClosed)
+            {
+                v.Add(v[0]);
+            }
+
+            DrawCurve(v);
+        }
+
+        private void DrawPolyline(Polyline l)
+        {
+            DrawCurve(l.Vertexes.Select(v => v.Position));
         }
 
         private void DrawMesh(Mesh m)
@@ -172,30 +323,17 @@ namespace dxf2fcs
             foreach (var item in m.Faces)
             {
                 DrawCurve(item.Select(vi => m.Vertexes[vi]).Append(m.Vertexes[item[0]]));
-                sb.AppendLine($"area {{a{i}}} boundary curve {{c{i}}}");
-                i++;
+                sb.AppendLine($"area {{a{iDrawed}}} boundary curve {{c{iDrawed}}}");
+                iDrawed++;
             }
         }
 
         private void DrawElipse(Ellipse e)
         {
-            var elipseLines = e.ToPolyline(4).Explode();
-
-            if (elipseLines != null && elipseLines[0] is Line la && elipseLines[2] is Line lb)
-            {
-                var A = la.StartPoint;
-                var B = lb.StartPoint;
-                var C = la.EndPoint;
-                var D = lb.EndPoint;
-
-                AppendLineVector3ToFcsVertex($"v{i}a", A);
-                AppendLineVector3ToFcsVertex($"v{i}b", B);
-                AppendLineVector3ToFcsVertex($"v{i}c", C);
-                AppendLineVector3ToFcsVertex($"v{i}d", D);
-
-                sb.AppendLine($"curve {{c{i}a}} arc vertex v{i}a v{i}c v{i}b ");
-                sb.AppendLine($"curve {{c{i}b}} arc vertex v{i}b v{i}d v{i}a ");
-            }
+            var angle = Math.Abs(e.EndAngle - e.StartAngle);
+            if (angle == 0) angle = 360;
+            var poly = e.ToPolyline((int)(angle / 90 * 12));
+            DrawPolyline(poly);
         }
 
         private void DrawCircle(Circle c)
@@ -209,42 +347,60 @@ namespace dxf2fcs
                 var C = la.EndPoint;
                 var D = lb.EndPoint;
 
-                AppendLineVector3ToFcsVertex($"v{i}a", A);
-                AppendLineVector3ToFcsVertex($"v{i}b", B);
-                AppendLineVector3ToFcsVertex($"v{i}c", C);
-                AppendLineVector3ToFcsVertex($"v{i}d", D);
+                AppendLineVector3ToFcsVertex($"v{iDrawed}a", A);
+                AppendLineVector3ToFcsVertex($"v{iDrawed}b", B);
+                AppendLineVector3ToFcsVertex($"v{iDrawed}c", C);
+                AppendLineVector3ToFcsVertex($"v{iDrawed}d", D);
 
-                sb.AppendLine($"curve {{c{i}a}} arc vertex v{i}a v{i}c v{i}b ");
-                sb.AppendLine($"curve {{c{i}b}} arc vertex v{i}b v{i}d v{i}a ");
+                sb.AppendLine($"curve {{c{iDrawed}a}} arc vertex v{iDrawed}a v{iDrawed}c v{iDrawed}b ");
+                sb.AppendLine($"curve {{c{iDrawed}b}} arc vertex v{iDrawed}b v{iDrawed}d v{iDrawed}a ");
             }
         }
 
         private void DrawArc(Arc a)
         {
             var explodedEntities = a.ToPolyline(2).Explode();
-
+            
             if (explodedEntities != null && explodedEntities[0] is Line la && explodedEntities[1] is Line lb)
             {
                 var A = la.StartPoint;
                 var B = lb.EndPoint;
                 var C = lb.StartPoint;
 
-                AppendLineVector3ToFcsVertex($"v{i}a", A);
-                AppendLineVector3ToFcsVertex($"v{i}b", B);
-                AppendLineVector3ToFcsVertex($"v{i}c", C);
+                AppendLineVector3ToFcsVertex($"v{iDrawed}a", A);
+                AppendLineVector3ToFcsVertex($"v{iDrawed}b", B);
+                AppendLineVector3ToFcsVertex($"v{iDrawed}c", C);
 
-                sb.AppendLine($"curve {{c{i}}} arc vertex v{i}a v{i}c v{i}b");
-            }
+                sb.AppendLine($"curve {{c{iDrawed}}} arc vertex v{iDrawed}a v{iDrawed}c v{iDrawed}b");
+            } 
         }
 
         private void DrawSpline(Spline l)
         {
-            DrawCurve(l.ControlPoints.Select(p => p.Position));
+            DrawPolyline(l.ToPolyline(l.ControlPoints.Count * 4));
+        }
+
+        private void DrawHatch(Hatch h)
+        {
+            var b = h.CreateBoundary(false);
+
+            var startI = iDrawed + 1;
+            foreach (var path in b)
+            {
+                EntitiesToFcs(new[] { path });
+            }
+
+            sb.Append($"area {{a{startI}}} boundary curve");
+            for (int i = startI; i <= iDrawed; i++)
+            {
+                sb.Append($" +{{c{i}}}");
+            }
+            sb.AppendLine();
         }
 
         private void DrawCurve(IEnumerable<Vector3> vectors)
         {
-            sb.AppendLine($"vs{i} = [");
+            sb.AppendLine($"vs{iDrawed} = [");
             foreach (var point in vectors)
             {
                 AppendVector3ToFcsArray(point);
@@ -252,15 +408,28 @@ namespace dxf2fcs
             }
             sb.AppendLine($"]");
 
-            sb.AppendLine($"curve {{c{i}}} filletedpoly items (cv(vs{i}))");
+            sb.AppendLine($"curve {{c{iDrawed}}} filletedpoly items (cvr(vs{iDrawed}))");
+        }
+
+        private void DrawCurve(IEnumerable<VectorRadius> vectors)
+        {
+            sb.AppendLine($"vs{iDrawed} = [");
+            foreach (var point in vectors)
+            {
+                AppendVector3ToFcsArray(point);
+                sb.AppendLine(",");
+            }
+            sb.AppendLine($"]");
+
+            sb.AppendLine($"curve {{c{iDrawed}}} filletedpoly items (cvr(vs{iDrawed})) radius");
         }
 
         private void DrawLine(Line l)
         {
-            AppendLineVector3ToFcsVertex($"v{i}a", l.StartPoint);
-            AppendLineVector3ToFcsVertex($"v{i}b", l.EndPoint);
+            AppendLineVector3ToFcsVertex($"v{iDrawed}a", l.StartPoint);
+            AppendLineVector3ToFcsVertex($"v{iDrawed}b", l.EndPoint);
 
-            sb.AppendLine($"curve {{c{i}}} vertex v{i}a v{i}b");
+            sb.AppendLine($"curve {{c{iDrawed}}} vertex v{iDrawed}a v{iDrawed}b");
         }
 
         private void AppendLineVector3ToFcsVertex(string name, Vector3 vLocal)
@@ -290,6 +459,21 @@ namespace dxf2fcs
             AppendNumber(v.Y);
             sb.Append(",");
             AppendNumber(v.Z);
+            sb.Append(",0]");
+        }
+
+        private void AppendVector3ToFcsArray(VectorRadius vLocal)
+        {
+            var v = Transform(vLocal.Point);
+
+            sb.Append($"[");
+            AppendNumber(v.X);
+            sb.Append(",");
+            AppendNumber(v.Y);
+            sb.Append(",");
+            AppendNumber(v.Z);
+            sb.Append(",");
+            AppendNumber(vLocal.Radius);
             sb.Append("]");
         }
 
