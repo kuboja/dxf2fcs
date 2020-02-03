@@ -382,7 +382,13 @@ namespace dxf2fcs
 
         private void DrawHatch(Hatch h)
         {
-            var b = h.CreateBoundary(false);
+            // var bAll = h.CreateBoundary(false);
+
+            var b = h.BoundaryPaths.Where(p => !p.PathType.HasFlag(HatchBoundaryPathTypeFlags.Outermost) && p.PathType != HatchBoundaryPathTypeFlags.Default)
+                .SelectMany(p => p.Edges.Select(e => e.ConvertTo())).ToList();
+
+            var o = h.BoundaryPaths.Where(p => p.PathType.HasFlag(HatchBoundaryPathTypeFlags.Outermost))
+                .SelectMany(p => p.Edges.Select(e => e.ConvertTo())).ToList();
 
             var startI = iDrawed + 1;
             foreach (var path in b)
@@ -390,12 +396,30 @@ namespace dxf2fcs
                 EntitiesToFcs(new[] { path });
             }
 
-            sb.Append($"area {{a{startI}}} boundary curve");
+            var sbArea = new StringBuilder();
+
+            sbArea.Append($"area {{a{startI}}} boundary curve");
             for (int i = startI; i <= iDrawed; i++)
             {
-                sb.Append($" +{{c{i}}}");
+                sbArea.Append($" +{{c{i}}}");
             }
-            sb.AppendLine();
+
+            if (o.Count > 0)
+            {
+                startI = iDrawed + 1;
+                foreach (var path in o)
+                {
+                    EntitiesToFcs(new[] { path });
+                }
+
+                sbArea.Append($" opening curve");
+                for (int i = startI; i <= iDrawed; i++)
+                {
+                    sbArea.Append($" -{{c{i}}}");
+                }
+            }
+
+            sb.AppendLine(sbArea.ToString());
         }
 
         private void DrawCurve(IEnumerable<Vector3> vectors)
