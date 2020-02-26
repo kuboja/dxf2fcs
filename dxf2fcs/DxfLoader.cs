@@ -22,10 +22,10 @@ namespace dxf2fcs
 
     public class FcsFunctions
     {
-        public bool Vertex3D = false;
-        public bool ArrToVertex3R = false;
-        public bool ArrToVertex3 = false;
-        public bool ArrToVertex2 = false;
+        public bool VertexXYZ = false;
+        public bool ArrToVertexXY = false;
+        public bool ArrToVertexXYZ = false;
+        public bool ArrToVertexYXZR = false;
     }
 
     public class DxfLoader
@@ -115,10 +115,10 @@ namespace dxf2fcs
 
             var file = new StringBuilder();
 
-            if (fns.ArrToVertex3) file.AppendLine("cv = ar => ar.Select(p => { Vertex = Fcs.Geometry.Vertex3D(p[0], p[1], p[2]), Radius = 0 })");
-            if (fns.ArrToVertex2) file.AppendLine("cv2 = ar => ar.Select(p => { Vertex = Fcs.Geometry.Vertex3D(p[0], p[1], 0), Radius = 0 })");
-            if (fns.ArrToVertex3R) file.AppendLine("cv3r = ar => ar.Select(p => { Vertex = Fcs.Geometry.Vertex3D(p[0], p[1], p[2]), Radius = p[3] })");
-            if (fns.Vertex3D) file.AppendLine("v = x,y,z => Fcs.Geometry.Vertex3D(x,y,z)");
+            if (fns.ArrToVertexXYZ) file.AppendLine("cv = ar => ar.Select(p => { Vertex = Fcs.Geometry.Vertex3D(p[0], p[1], p[2]), Radius = 0 })");
+            if (fns.ArrToVertexXY) file.AppendLine("cvXY = ar => ar.Select(p => { Vertex = Fcs.Geometry.Vertex3D(p[0], p[1], 0), Radius = 0 })");
+            if (fns.ArrToVertexYXZR) file.AppendLine("cvXYZr = ar => ar.Select(p => { Vertex = Fcs.Geometry.Vertex3D(p[0], p[1], p[2]), Radius = p[3] })");
+            if (fns.VertexXYZ) file.AppendLine("v = x,y,z => Fcs.Geometry.Vertex3D(x,y,z)");
 
             return file.Append(sb).ToString();
         }
@@ -479,8 +479,8 @@ namespace dxf2fcs
             var i = ++iDrawedLine;
 
             AppendLineVector3ToFcsVertex($"v{i}a", A);
-            AppendLineVector3ToFcsVertex($"v{i}b", B);
             AppendLineVector3ToFcsVertex($"v{i}c", C);
+            AppendLineVector3ToFcsVertex($"v{i}b", B);
 
             sb.AppendLine($"curve {{c{i}}} arc vertex v{i}a v{i}c v{i}b");
 
@@ -496,13 +496,24 @@ namespace dxf2fcs
         {
             var i = ++iDrawedLine;
 
-            fns.ArrToVertex3 = true;
-            var fn = "cv";
+            var onlyXY = vectors.All(v => v.Z == 0);
+
+            var fn = "";
+            if (onlyXY)
+            {
+                fns.ArrToVertexXY = true;
+                fn = "cvXY";
+            }
+            else
+            {
+                fns.ArrToVertexXYZ = true;
+                fn = "cv";
+            }
 
             sb.AppendLine($"vs{i} = [");
             foreach (var point in vectors)
             {
-                AppendVector3ToFcsArray(point);
+                AppendVector3ToFcsArray(point, onlyXY);
                 sb.AppendLine(",");
             }
             sb.AppendLine($"]");
@@ -532,7 +543,7 @@ namespace dxf2fcs
                 sb.AppendLine($"vertex {{{name}}} xyz {Math.Round(v.X, precision)} {Math.Round(v.Y, precision)} {Math.Round(v.Z, precision)}");
             else
             {
-                fns.Vertex3D = true;
+                fns.VertexXYZ = true;
 
                 sb.Append($"{name}=v(");
                 AppendNumber(v.X);
@@ -543,7 +554,7 @@ namespace dxf2fcs
                 sb.AppendLine(")");
             }
         }
-        private void AppendVector3ToFcsArray(Vector3 vLocal)
+        private void AppendVector3ToFcsArray(Vector3 vLocal, bool onlyXY = false)
         {
             var v = Transform(vLocal);
 
@@ -551,8 +562,11 @@ namespace dxf2fcs
             AppendNumber(v.X);
             sb.Append(",");
             AppendNumber(v.Y);
-            sb.Append(",");
-            AppendNumber(v.Z);
+            if (!onlyXY)
+            {
+                sb.Append(",");
+                AppendNumber(v.Z);
+            }
             sb.Append("]");
         }
 
