@@ -8,18 +8,6 @@ using System.Text;
 
 namespace dxf2fcs
 {
-    public class Vector3Radius
-    {
-        public Vector3 Point;
-        public double Radius;
-
-        public Vector3Radius(Vector3 point, double radius = 0)
-        {
-            Point = point;
-            Radius = radius;
-        }
-    }
-
     public class Vector3Middle
     {
         public Vector3 Point;
@@ -139,11 +127,11 @@ namespace dxf2fcs
                     case Ellipse e:
                         AddToIds(ids, DrawElipse(e));
                         break;
-                    case Mesh m:
-                        DrawMesh(m);
-                        break;
                     case LwPolyline lp:
                         AddToIds(ids, DrawPolyline(lp));
+                        break;
+                    case Mesh m:
+                        DrawMesh(m);
                         break;
                     case Insert insert:
                         DrawInsert(insert);
@@ -211,23 +199,63 @@ namespace dxf2fcs
             BackTrans();
         }
 
-        private void DrawPolyline2(LwPolyline l)
+        private void DrawMesh(Mesh m)
         {
-            var v = new List<Vector3>();
-
-            foreach (var e in l.Vertexes)
+            foreach (var item in m.Faces)
             {
-                var p1 = MathHelper.Transform(new Vector3(e.Position.X, e.Position.Y, l.Elevation), l.Normal, CoordinateSystem.Object, CoordinateSystem.World);
+                var ic = DrawCurve(item.Select(vi => m.Vertexes[vi]).Append(m.Vertexes[item[0]]));
+                var ia = ++iDrawedArea;
+                sb.AppendLine($"area {{a{ia}}} boundary curve {{c{ic}}} mapping Linear");
+            }
+        }
 
-                v.Add(p1);
+        private void DrawHatch(Hatch h)
+        {
+            var sbArea = new StringBuilder();
+            foreach (var bPath in h.BoundaryPaths)
+            {
+                var isBoundaryCurve = !bPath.PathType.HasFlag(HatchBoundaryPathTypeFlags.Outermost);
+                var isOpeningCurve = bPath.PathType.HasFlag(HatchBoundaryPathTypeFlags.Outermost);
+
+                //var startI = iDrawed + 1;
+                var b = bPath.Edges.Select(e => e.ConvertTo()).ToArray();
+
+                var ids = new List<int>();
+
+                foreach (var path in b)
+                {
+                    AddToIds(ids, EntitiesToFcs(new[] { path }));
+                }
+
+                if (isBoundaryCurve)
+                {
+                    // every boundary curve create new area
+                    if (sbArea.Length > 0)
+                    {
+                        sb.AppendLine(sbArea.ToString());
+                        sbArea.Clear();
+                    }
+
+                    var i = ++iDrawedArea;
+                    sbArea.Append($"area {{a{i}}} boundary curve");
+                }
+                else if (isOpeningCurve)
+                {
+                    sbArea.Append($" opening curve");
+                }
+
+                foreach (var i in ids)
+                {
+                    sbArea.Append($" +{{c{i}}}");
+                }
+
+                if (ids.Count == 4)
+                {
+                    sbArea.Append(" mapping Linear");
+                }
             }
 
-            if (l.IsClosed)
-            {
-                v.Add(v[0]);
-            }
-
-            DrawCurve(v);
+            sb.AppendLine(sbArea.ToString());
         }
 
         private List<int> DrawPolyline(LwPolyline l)
@@ -259,21 +287,19 @@ namespace dxf2fcs
                         }
 
                         // if current entity is in wrong orientation
-                        if (L.Equals(A, Math.Pow(10, -8)))
+                        if (!L.Equals(A, Math.Pow(10, -8)))
                         {
-                            v.Add(new Vector3Middle(B));
+                            v.Add(new Vector3Middle(A));
                         }
                         else
                         {
-                            v.Add(new Vector3Middle(A));
-                 //           v.Add(new Vector3Radius(B));
+                            v.Add(new Vector3Middle(B));
                         }
                     }
                 }
 
                 else if (en is Arc arc)
                 {
-                    //AddArcToPolylineNew(arc, i, v);
                     AddArcToArc(arc, i, v);
                 }
 
@@ -286,10 +312,9 @@ namespace dxf2fcs
                 v.Add(v[0]);
             }
 
-
             var ids = new List<int>();
 
-            // draw
+            // drawing
             var polyline = new List<Vector3>();
             polyline.Add(v[0].Point);
 
@@ -337,57 +362,6 @@ namespace dxf2fcs
             v[0].MiddlePoint = default;
         }
 
-        private void AddArcToPolylineNew(Arc arc, int i, List<Vector3Radius> v)
-        {
-            var linesAB = arc.ToPolyline(3).Explode().Select(e => (Line)e).ToArray();
-
-            var A = linesAB[0].StartPoint;
-            var B = linesAB[2].EndPoint;
-            var S = (A + B) / 2;
-            var C = arc.Center;
-
-            var r = arc.Radius;
-
-            var U = S - C;
-            U.Normalize();
-
-            var phi = Math.Abs(arc.StartAngle - arc.EndAngle) / 2;
-            var d = r / Math.Cos(phi / 180 * Math.PI);
-
-            var X = C + d * U;
-
-            if (i == 0)
-            {
-                v.Add(new Vector3Radius(A));
-                v.Add(new Vector3Radius(X, r));
-                v.Add(new Vector3Radius(B));
-            }
-            else
-            {
-                var L = v[v.Count - 1].Point;
-
-                // if the first entity was in wrong orientation
-                if (i == 1 && !L.Equals(A, Math.Pow(10, -8)) && !L.Equals(B, Math.Pow(10, -8)))
-                {
-                    v.Reverse();
-                }
-
-                // if current entity is in wrong orientation
-                if (!L.Equals(A, Math.Pow(10, -8)))
-                {
-                    v.Add(new Vector3Radius(B));
-                    v.Add(new Vector3Radius(X));
-                    v.Add(new Vector3Radius(A));
-                }
-                else
-                {
-                    v.Add(new Vector3Radius(A));
-                    v.Add(new Vector3Radius(X));
-                    v.Add(new Vector3Radius(B));
-                }
-            }
-        }
-
         private void AddArcToArc(Arc arc, int i, List<Vector3Middle> v)
         {
             var poly = arc.ToPolyline(2).Explode().Select(l => (Line)l).ToList();
@@ -410,77 +384,21 @@ namespace dxf2fcs
             {
                 var L = v[v.Count - 1].Point;
 
-                // if the first entity was in wrong orientation
+                // if the first entity is in wrong orientation
                 if (i == 1 && !L.Equals(A, Math.Pow(10, -8)) && !L.Equals(B, Math.Pow(10, -8)))
                 {
                     ReverseFcsPolyline(v);
                 }
 
                 // if current entity is in wrong orientation
-                if (L.Equals(A, Math.Pow(10, -8)))
+                if (!L.Equals(A, Math.Pow(10, -8)))
                 {
-                    v.Add(new Vector3Middle(B, C));
+                    v.Add(new Vector3Middle(A, C));
                 }
                 else
                 {
-                    v.Add(new Vector3Middle(A, C));
-                  //  v.Add(new Vector3Radius(B));
+                    v.Add(new Vector3Middle(B, C));
                 }
-            }
-        }
-
-        private void AddArcToPolyline(Arc arc, int i, List<Vector3> v)
-        {
-            var angle = Math.Abs((arc.EndAngle < arc.StartAngle ? arc.EndAngle + 360 : arc.EndAngle) - arc.StartAngle);
-            if (angle == 0) angle = 360;
-
-            var poly = arc.ToPolyline(Math.Max(3, (int)(angle / 90 * 8))).Explode().Select(l => (Line)l).ToList();
-
-            var A = poly[0].StartPoint;
-            var B = poly[poly.Count - 1].EndPoint;
-
-            var reversed = false;
-
-            if (i == 0)
-            {
-                v.Add(A);
-            }
-            else
-            {
-                var L = v[v.Count - 1];
-
-                // if the first entity was in wrong orientation
-                if (i == 1 && !L.Equals(A, Math.Pow(10, -8)) && !L.Equals(B, Math.Pow(10, -8)))
-                {
-                    v.Reverse();
-                }
-
-                // if current entity is in wrong orientation
-                if (!L.Equals(A, Math.Pow(10, -8)))
-                {
-                    poly.Reverse();
-                    reversed = true;
-                }
-            }
-
-            foreach (var arcLine in poly)
-            {
-                v.Add(reversed ? arcLine.StartPoint : arcLine.EndPoint);
-            }
-        }
-
-        private void DrawPolyline(Polyline l)
-        {
-            DrawCurve(l.Vertexes.Select(v => v.Position));
-        }
-
-        private void DrawMesh(Mesh m)
-        {
-            foreach (var item in m.Faces)
-            {
-                var ic = DrawCurve(item.Select(vi => m.Vertexes[vi]).Append(m.Vertexes[item[0]]));
-                var ia = ++iDrawedArea;
-                sb.AppendLine($"area {{a{ia}}} boundary curve {{c{ic}}} mapping Linear");
             }
         }
 
@@ -555,56 +473,6 @@ namespace dxf2fcs
             return DrawCurve(l.PolygonalVertexes(l.ControlPoints.Count * 2));
         }
 
-        private void DrawHatch(Hatch h)
-        {
-            var sbArea = new StringBuilder();
-            foreach (var bPath in h.BoundaryPaths)
-            {
-                var isBoundaryCurve = !bPath.PathType.HasFlag(HatchBoundaryPathTypeFlags.Outermost);
-                var isOpeningCurve = bPath.PathType.HasFlag(HatchBoundaryPathTypeFlags.Outermost);
-
-                //var startI = iDrawed + 1;
-                var b = bPath.Edges.Select(e => e.ConvertTo()).ToArray();
-
-                var ids = new List<int>();
-
-                foreach (var path in b)
-                {
-                    AddToIds(ids, EntitiesToFcs(new[] { path }));
-                }
-
-                if (isBoundaryCurve)
-                {
-                    // every boundary curve create new area
-                    if (sbArea.Length > 0)
-                    {
-                        sb.AppendLine(sbArea.ToString());
-                        sbArea.Clear();
-                    }
-
-                    var i = ++iDrawedArea;
-                    sbArea.Append($"area {{a{i}}} boundary curve");
-                }
-                else if (isOpeningCurve)
-                {
-                    sbArea.Append($" opening curve");
-                }
-
-                foreach (var i in ids)
-                {
-                    sbArea.Append($" +{{c{i}}}");
-                }
-
-                if (ids.Count == 4)
-                {
-                    sbArea.Append(" mapping Linear");
-                }
-            }
-
-            sb.AppendLine(sbArea.ToString());
-        }
-
-
         private int DrawCurve(IEnumerable<Vector3> vectors)
         {
             var i = ++iDrawedLine;
@@ -661,21 +529,6 @@ namespace dxf2fcs
             AppendNumber(v.Y);
             sb.Append(",");
             AppendNumber(v.Z);
-            sb.Append("]");
-        }
-
-        private void AppendVector3ToFcsArray(Vector3Radius vLocal)
-        {
-            var v = Transform(vLocal.Point);
-
-            sb.Append($"[");
-            AppendNumber(v.X);
-            sb.Append(",");
-            AppendNumber(v.Y);
-            sb.Append(",");
-            AppendNumber(v.Z);
-            sb.Append(",");
-            AppendNumber(vLocal.Radius);
             sb.Append("]");
         }
 
