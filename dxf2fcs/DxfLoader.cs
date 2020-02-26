@@ -20,6 +20,14 @@ namespace dxf2fcs
         }
     }
 
+    public class FcsFunctions
+    {
+        public bool Vertex3D = false;
+        public bool ArrToVertex3R = false;
+        public bool ArrToVertex3 = false;
+        public bool ArrToVertex2 = false;
+    }
+
     public class DxfLoader
     {
         private readonly double unit;
@@ -29,6 +37,8 @@ namespace dxf2fcs
         private readonly StringBuilder sb;
         private readonly Stack<Matrix3> transformations;
         private readonly Stack<Vector3> translations;
+
+        private FcsFunctions fns;
 
         //private int iDrawed;
 
@@ -67,6 +77,7 @@ namespace dxf2fcs
             sb.Clear();
             iDrawedLine = 0;
             iDrawedArea = 0;
+            fns = new FcsFunctions();
 
             trans = Matrix3.Identity;
             translation = Vector3.Zero;
@@ -76,9 +87,9 @@ namespace dxf2fcs
             translations.Clear();
             translations.Push(translation);
 
-            sb.AppendLine("cv = ar => ar.Select(v => { Vertex = Fcs.Geometry.Vertex3D(v[0], v[1], v[2]), Radius = 0 } )");
-            sb.AppendLine("cvr = ar => ar.Select(v => { Vertex = Fcs.Geometry.Vertex3D(v[0], v[1], v[2]), Radius = v[3] } )");
-            sb.AppendLine("v = x,y,z => Fcs.Geometry.Vertex3D(x,y,z)");
+            //sb.AppendLine("cv = ar => ar.Select(v => { Vertex = Fcs.Geometry.Vertex3D(v[0], v[1], v[2]), Radius = 0 } )");
+            //sb.AppendLine("cvr = ar => ar.Select(v => { Vertex = Fcs.Geometry.Vertex3D(v[0], v[1], v[2]), Radius = v[3] } )");
+            //sb.AppendLine("v = x,y,z => Fcs.Geometry.Vertex3D(x,y,z)");
 
             EntitiesToFcs(doc.Inserts);
             EntitiesToFcs(doc.Lines);
@@ -101,7 +112,15 @@ namespace dxf2fcs
             EntitiesToFcs(doc.Images);
             EntitiesToFcs(doc.Hatches);
             //EntitiesToFcs(doc.Groups);
-            return sb.ToString();
+
+            var file = new StringBuilder();
+
+            if (fns.ArrToVertex3) file.AppendLine("cv = ar => ar.Select(p => { Vertex = Fcs.Geometry.Vertex3D(p[0], p[1], p[2]), Radius = 0 })");
+            if (fns.ArrToVertex2) file.AppendLine("cv2 = ar => ar.Select(p => { Vertex = Fcs.Geometry.Vertex3D(p[0], p[1], 0), Radius = 0 })");
+            if (fns.ArrToVertex3R) file.AppendLine("cv3r = ar => ar.Select(p => { Vertex = Fcs.Geometry.Vertex3D(p[0], p[1], p[2]), Radius = p[3] })");
+            if (fns.Vertex3D) file.AppendLine("v = x,y,z => Fcs.Geometry.Vertex3D(x,y,z)");
+
+            return file.Append(sb).ToString();
         }
 
         private List<int> EntitiesToFcs(IEnumerable<EntityObject> entities)
@@ -477,6 +496,9 @@ namespace dxf2fcs
         {
             var i = ++iDrawedLine;
 
+            fns.ArrToVertex3 = true;
+            var fn = "cv";
+
             sb.AppendLine($"vs{i} = [");
             foreach (var point in vectors)
             {
@@ -485,7 +507,7 @@ namespace dxf2fcs
             }
             sb.AppendLine($"]");
 
-            sb.AppendLine($"curve {{c{i}}} filletedpoly items (cv(vs{i}))");
+            sb.AppendLine($"curve {{c{i}}} filletedpoly items ({fn}(vs{i}))");
 
             return i;
         }
@@ -510,6 +532,8 @@ namespace dxf2fcs
                 sb.AppendLine($"vertex {{{name}}} xyz {Math.Round(v.X, precision)} {Math.Round(v.Y, precision)} {Math.Round(v.Z, precision)}");
             else
             {
+                fns.Vertex3D = true;
+
                 sb.Append($"{name}=v(");
                 AppendNumber(v.X);
                 sb.Append(",");
