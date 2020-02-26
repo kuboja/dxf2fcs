@@ -42,7 +42,11 @@ namespace dxf2fcs
         private readonly Stack<Matrix3> transformations;
         private readonly Stack<Vector3> translations;
 
-        private int iDrawed;
+        //private int iDrawed;
+
+        private int iDrawedLine;
+        private int iDrawedArea;
+
         private Matrix3 trans;
         private Vector3 translation;
         
@@ -73,7 +77,8 @@ namespace dxf2fcs
             var doc = DxfDocument.Load(dxfFilePath);
 
             sb.Clear();
-            iDrawed = 0;
+            iDrawedLine = 0;
+            iDrawedArea = 0;
 
             trans = Matrix3.Identity;
             translation = Vector3.Zero;
@@ -117,7 +122,6 @@ namespace dxf2fcs
 
             foreach (var item in entities)
             {
-                iDrawed++;
                 switch (item)
                 {
                     case Line l:
@@ -301,16 +305,14 @@ namespace dxf2fcs
                 {
                     if (polyline.Count > 1)
                     {
-                        ids.Add(++iDrawed);
-                        DrawCurve(polyline);
+                        ids.Add(DrawCurve(polyline));
                     }
 
                     var A = polyline.Last();
                     var B = cr.Point;
                     var C = cr.MiddlePoint;
 
-                    ids.Add(++iDrawed);
-                    DrawArc(A, B, C);
+                    ids.Add(DrawArc(A, B, C));
                     
                     polyline.Clear();
                     polyline.Add(B);
@@ -319,9 +321,7 @@ namespace dxf2fcs
 
             if (polyline.Count > 1)
             {
-                iDrawed++;
-                ids.Add(iDrawed);
-                DrawCurve(polyline);
+                ids.Add(DrawCurve(polyline));
             }
 
             return ids;
@@ -478,9 +478,9 @@ namespace dxf2fcs
         {
             foreach (var item in m.Faces)
             {
-                DrawCurve(item.Select(vi => m.Vertexes[vi]).Append(m.Vertexes[item[0]]));
-                sb.AppendLine($"area {{a{iDrawed}}} boundary curve {{c{iDrawed}}} mapping Linear");
-                iDrawed++;
+                var ic = DrawCurve(item.Select(vi => m.Vertexes[vi]).Append(m.Vertexes[item[0]]));
+                var ia = ++iDrawedArea;
+                sb.AppendLine($"area {{a{ia}}} boundary curve {{c{ic}}} mapping Linear");
             }
         }
 
@@ -498,21 +498,24 @@ namespace dxf2fcs
 
             if (circleLines != null && circleLines[0] is Line la && circleLines[2] is Line lb)
             {
+                var i1 = ++iDrawedLine;
+                var i2 = ++iDrawedLine;
+
                 var A = la.StartPoint;
                 var B = lb.StartPoint;
                 var C = la.EndPoint;
                 var D = lb.EndPoint;
 
-                AppendLineVector3ToFcsVertex($"v{iDrawed}a", A);
-                AppendLineVector3ToFcsVertex($"v{iDrawed}b", B);
-                AppendLineVector3ToFcsVertex($"v{iDrawed}c", C);
-                AppendLineVector3ToFcsVertex($"v{iDrawed}d", D);
+                AppendLineVector3ToFcsVertex($"v{i1}a", A);
+                AppendLineVector3ToFcsVertex($"v{i1}b", B);
+                AppendLineVector3ToFcsVertex($"v{i1}c", C);
+                AppendLineVector3ToFcsVertex($"v{i1}d", D);
 
-                sb.AppendLine($"curve {{c{iDrawed}}} arc vertex v{iDrawed}a v{iDrawed}c v{iDrawed}b ");
-                iDrawed++;
-                sb.AppendLine($"curve {{c{iDrawed}}} arc vertex v{iDrawed}b v{iDrawed}d v{iDrawed}a ");
 
-                return new List<int> { iDrawed - 1, iDrawed };
+                sb.AppendLine($"curve {{c{i1}}} arc vertex v{i1}a v{i1}c v{i1}b ");
+                sb.AppendLine($"curve {{c{i2}}} arc vertex v{i1}b v{i1}d v{i1}a ");
+
+                return new List<int> { i1, i2 };
             }
 
             return default;
@@ -536,13 +539,15 @@ namespace dxf2fcs
 
         private int DrawArc(Vector3 A, Vector3 B, Vector3 C)
         {
-            AppendLineVector3ToFcsVertex($"v{iDrawed}a", A);
-            AppendLineVector3ToFcsVertex($"v{iDrawed}b", B);
-            AppendLineVector3ToFcsVertex($"v{iDrawed}c", C);
+            var i = ++iDrawedLine;
 
-            sb.AppendLine($"curve {{c{iDrawed}}} arc vertex v{iDrawed}a v{iDrawed}c v{iDrawed}b");
+            AppendLineVector3ToFcsVertex($"v{i}a", A);
+            AppendLineVector3ToFcsVertex($"v{i}b", B);
+            AppendLineVector3ToFcsVertex($"v{i}c", C);
 
-            return iDrawed;
+            sb.AppendLine($"curve {{c{i}}} arc vertex v{i}a v{i}c v{i}b");
+
+            return i;
         }
 
         private int DrawSpline(Spline l)
@@ -577,7 +582,8 @@ namespace dxf2fcs
                         sbArea.Clear();
                     }
 
-                    sbArea.Append($"area {{a{iDrawed}}} boundary curve");
+                    var i = ++iDrawedArea;
+                    sbArea.Append($"area {{a{i}}} boundary curve");
                 }
                 else if (isOpeningCurve)
                 {
@@ -593,19 +599,17 @@ namespace dxf2fcs
                 {
                     sbArea.Append(" mapping Linear");
                 }
-
-                //for (int i = startI; i <= iDrawed; i++)
-                //{
-                //    sbArea.Append($" +{{c{i}}}");
-                //}
             }
 
             sb.AppendLine(sbArea.ToString());
         }
 
+
         private int DrawCurve(IEnumerable<Vector3> vectors)
         {
-            sb.AppendLine($"vs{iDrawed} = [");
+            var i = ++iDrawedLine;
+
+            sb.AppendLine($"vs{i} = [");
             foreach (var point in vectors)
             {
                 AppendVector3ToFcsArray(point);
@@ -613,32 +617,21 @@ namespace dxf2fcs
             }
             sb.AppendLine($"]");
 
-            sb.AppendLine($"curve {{c{iDrawed}}} filletedpoly items (cv(vs{iDrawed}))");
+            sb.AppendLine($"curve {{c{i}}} filletedpoly items (cv(vs{i}))");
 
-            return iDrawed;
-        }
-
-        private void DrawCurve(IEnumerable<Vector3Radius> vectors)
-        {
-            sb.AppendLine($"vs{iDrawed} = [");
-            foreach (var point in vectors)
-            {
-                AppendVector3ToFcsArray(point);
-                sb.AppendLine(",");
-            }
-            sb.AppendLine($"]");
-
-            sb.AppendLine($"curve {{c{iDrawed}}} filletedpoly items (cvr(vs{iDrawed})) radius 1");
+            return i;
         }
 
         private int DrawLine(Line l)
         {
-            AppendLineVector3ToFcsVertex($"v{iDrawed}a", l.StartPoint);
-            AppendLineVector3ToFcsVertex($"v{iDrawed}b", l.EndPoint);
+            var i = ++iDrawedLine;
 
-            sb.AppendLine($"curve {{c{iDrawed}}} vertex v{iDrawed}a v{iDrawed}b");
+            AppendLineVector3ToFcsVertex($"v{i}a", l.StartPoint);
+            AppendLineVector3ToFcsVertex($"v{i}b", l.EndPoint);
 
-            return iDrawed;
+            sb.AppendLine($"curve {{c{i}}} vertex v{i}a v{i}b");
+
+            return i;
         }
 
         private void AppendLineVector3ToFcsVertex(string name, Vector3 vLocal)
