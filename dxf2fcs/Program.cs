@@ -48,7 +48,7 @@ namespace dxf2fcs
                 var loader = new DxfLoader(options.Unit, options.Precision);
                 var fcs = loader.ToFcs(dxfFilePath);
 
-                using (var sw = new StreamWriter(fcsFilePath))
+                using (var sw = new StreamWriter(fcsFilePath, false, System.Text.Encoding.UTF8))
                 {
                     sw.Write(fcs);
                     sw.Close();
