@@ -8,7 +8,7 @@ using System.Text;
 
 namespace dxf2fcs
 {
-    public struct Vector3Radius
+    public class Vector3Radius
     {
         public Vector3 Point;
         public double Radius;
@@ -17,6 +17,18 @@ namespace dxf2fcs
         {
             Point = point;
             Radius = radius;
+        }
+    }
+
+    public class Vector3Middle
+    {
+        public Vector3 Point;
+        public Vector3 MiddlePoint;
+
+        public Vector3Middle(Vector3 point, Vector3 middlePoint = default)
+        {
+            Point = point;
+            MiddlePoint = middlePoint;
         }
     }
 
@@ -99,46 +111,64 @@ namespace dxf2fcs
             return sb.ToString();
         }
 
-        private void EntitiesToFcs(IEnumerable<EntityObject> entities)
+        private List<int> EntitiesToFcs(IEnumerable<EntityObject> entities)
         {
+            var ids = new List<int>();
+
+            foreach (var item in entities)
             {
-                foreach (var item in entities)
+                iDrawed++;
+                switch (item)
                 {
-                    iDrawed++;
-                    switch (item)
-                    {
-                        case Line l:
-                            DrawLine(l);
-                            break;
-                        case Spline l:
-                            DrawSpline(l);
-                            break;
-                        case Arc a:
-                            DrawArc(a);
-                            break;
-                        case Circle c:
-                            DrawCircle(c);
-                            break;
-                        case Ellipse e:
-                            DrawElipse(e);
-                            break;
-                        case Mesh m:
-                            DrawMesh(m);
-                            break;
-                        case LwPolyline lp:
-                            DrawPolyline(lp);
-                            break;
-                        case Insert insert:
-                            DrawInsert(insert);
-                            break;
-                        case Hatch hatch:
-                            DrawHatch(hatch);
-                            break;
-                        default:
-                            Console.WriteLine($"Nepodporovaná entita: {item.GetType()}");
-                            break;
-                    }
+                    case Line l:
+                        AddToIds(ids, DrawLine(l));
+                        break;
+                    case Spline l:
+                        AddToIds(ids, DrawSpline(l));
+                        break;
+                    case Arc a:
+                        AddToIds(ids, DrawArc(a));
+                        break;
+                    case Circle c:
+                        AddToIds(ids, DrawCircle(c));
+                        break;
+                    case Ellipse e:
+                        AddToIds(ids, DrawElipse(e));
+                        break;
+                    case Mesh m:
+                        DrawMesh(m);
+                        break;
+                    case LwPolyline lp:
+                        AddToIds(ids, DrawPolyline(lp));
+                        break;
+                    case Insert insert:
+                        DrawInsert(insert);
+                        break;
+                    case Hatch hatch:
+                        DrawHatch(hatch);
+                        break;
+                    default:
+                        Console.WriteLine($"Nepodporovaná entita: {item.GetType()}");
+                        break;
                 }
+            }
+
+            return ids;
+        }
+
+        private void AddToIds(List<int> ids, List<int> nextIds)
+        {
+            if (nextIds != null && nextIds.Count >= 0)
+            {
+                ids.AddRange(nextIds);
+            }
+        }
+
+        private void AddToIds(List<int> ids, int nextId)
+        {
+            if (nextId >= 0)
+            {
+                ids.Add(nextId);
             }
         }
 
@@ -196,11 +226,11 @@ namespace dxf2fcs
             DrawCurve(v);
         }
 
-        private void DrawPolyline(LwPolyline l)
+        private List<int> DrawPolyline(LwPolyline l)
         {
             var ex = l.Explode();
 
-            var v = new List<Vector3>();
+            var v = new List<Vector3Middle>();
 
             var i = 0;
             foreach (var en in ex)
@@ -212,27 +242,27 @@ namespace dxf2fcs
 
                     if (i == 0)
                     {
-                        v.Add((A));
-                        v.Add((B));
+                        v.Add(new Vector3Middle(A));
+                        v.Add(new Vector3Middle(B));
                     }
                     else {
-                        var L = v[v.Count - 1];
+                        var L = v[v.Count - 1].Point;
 
                         // if the first entity was in wrong orientation
                         if (i == 1 && !L.Equals(A, Math.Pow(10, -8)) && !L.Equals(B, Math.Pow(10, -8)))
                         {
-                            v.Reverse();
+                            ReverseFcsPolyline(v);
                         }
 
                         // if current entity is in wrong orientation
                         if (L.Equals(A, Math.Pow(10, -8)))
                         {
-                            v.Add((B));
+                            v.Add(new Vector3Middle(B));
                         }
                         else
                         {
-                            v.Add((A));
-                            v.Add((B));
+                            v.Add(new Vector3Middle(A));
+                 //           v.Add(new Vector3Radius(B));
                         }
                     }
                 }
@@ -240,18 +270,71 @@ namespace dxf2fcs
                 else if (en is Arc arc)
                 {
                     //AddArcToPolylineNew(arc, i, v);
-                    AddArcToPolyline(arc, i, v);
+                    AddArcToArc(arc, i, v);
                 }
 
                 i++;
             }
 
-            if (l.IsClosed)
+            var Lc = v.Last().Point;
+            if (l.IsClosed && !Lc.Equals(v[0].Point, Math.Pow(10, -8)))
             {
                 v.Add(v[0]);
             }
 
-            DrawCurve(v);
+
+            var ids = new List<int>();
+
+            // draw
+            var polyline = new List<Vector3>();
+            polyline.Add(v[0].Point);
+
+            for (int j = 1; j < v.Count; j++)
+            {
+                var cr = v[j];
+
+                if (cr.MiddlePoint == default)
+                {
+                    polyline.Add(cr.Point);
+                }
+                else
+                {
+                    if (polyline.Count > 1)
+                    {
+                        ids.Add(++iDrawed);
+                        DrawCurve(polyline);
+                    }
+
+                    var A = polyline.Last();
+                    var B = cr.Point;
+                    var C = cr.MiddlePoint;
+
+                    ids.Add(++iDrawed);
+                    DrawArc(A, B, C);
+                    
+                    polyline.Clear();
+                    polyline.Add(B);
+                }
+            }
+
+            if (polyline.Count > 1)
+            {
+                iDrawed++;
+                ids.Add(iDrawed);
+                DrawCurve(polyline);
+            }
+
+            return ids;
+        }
+
+        private void ReverseFcsPolyline(List<Vector3Middle> v)
+        {
+            v.Reverse();
+            for (int i = 1; i < v.Count; i++)
+            {
+                v[i].MiddlePoint = v[i - 1].MiddlePoint;
+            }
+            v[0].MiddlePoint = default;
         }
 
         private void AddArcToPolylineNew(Arc arc, int i, List<Vector3Radius> v)
@@ -301,6 +384,47 @@ namespace dxf2fcs
                     v.Add(new Vector3Radius(A));
                     v.Add(new Vector3Radius(X));
                     v.Add(new Vector3Radius(B));
+                }
+            }
+        }
+
+        private void AddArcToArc(Arc arc, int i, List<Vector3Middle> v)
+        {
+            var poly = arc.ToPolyline(2).Explode().Select(l => (Line)l).ToList();
+
+            if (!(poly != null && poly[0] is Line la && poly[1] is Line lb))
+            {
+                return;
+            }
+
+            var A = la.StartPoint;
+            var B = lb.EndPoint;
+            var C = lb.StartPoint;
+
+            if (i == 0)
+            {
+                v.Add(new Vector3Middle(A));
+                v.Add(new Vector3Middle(B, C));
+            }
+            else
+            {
+                var L = v[v.Count - 1].Point;
+
+                // if the first entity was in wrong orientation
+                if (i == 1 && !L.Equals(A, Math.Pow(10, -8)) && !L.Equals(B, Math.Pow(10, -8)))
+                {
+                    ReverseFcsPolyline(v);
+                }
+
+                // if current entity is in wrong orientation
+                if (L.Equals(A, Math.Pow(10, -8)))
+                {
+                    v.Add(new Vector3Middle(B, C));
+                }
+                else
+                {
+                    v.Add(new Vector3Middle(A, C));
+                  //  v.Add(new Vector3Radius(B));
                 }
             }
         }
@@ -355,20 +479,20 @@ namespace dxf2fcs
             foreach (var item in m.Faces)
             {
                 DrawCurve(item.Select(vi => m.Vertexes[vi]).Append(m.Vertexes[item[0]]));
-                sb.AppendLine($"area {{a{iDrawed}}} boundary curve {{c{iDrawed}}}");
+                sb.AppendLine($"area {{a{iDrawed}}} boundary curve {{c{iDrawed}}} mapping Linear");
                 iDrawed++;
             }
         }
 
-        private void DrawElipse(Ellipse e)
+        private List<int> DrawElipse(Ellipse e)
         {
             var angle = Math.Abs(e.EndAngle - e.StartAngle);
             if (angle == 0) angle = 360;
             var poly = e.ToPolyline((int)(angle / 90 * 12));
-            DrawPolyline(poly);
+            return DrawPolyline(poly);
         }
 
-        private void DrawCircle(Circle c)
+        private List<int> DrawCircle(Circle c)
         {
             var circleLines = c.ToPolyline(4).Explode();
 
@@ -384,12 +508,17 @@ namespace dxf2fcs
                 AppendLineVector3ToFcsVertex($"v{iDrawed}c", C);
                 AppendLineVector3ToFcsVertex($"v{iDrawed}d", D);
 
-                sb.AppendLine($"curve {{c{iDrawed}a}} arc vertex v{iDrawed}a v{iDrawed}c v{iDrawed}b ");
-                sb.AppendLine($"curve {{c{iDrawed}b}} arc vertex v{iDrawed}b v{iDrawed}d v{iDrawed}a ");
+                sb.AppendLine($"curve {{c{iDrawed}}} arc vertex v{iDrawed}a v{iDrawed}c v{iDrawed}b ");
+                iDrawed++;
+                sb.AppendLine($"curve {{c{iDrawed}}} arc vertex v{iDrawed}b v{iDrawed}d v{iDrawed}a ");
+
+                return new List<int> { iDrawed - 1, iDrawed };
             }
+
+            return default;
         }
 
-        private void DrawArc(Arc a)
+        private int DrawArc(Arc a)
         {
             var explodedEntities = a.ToPolyline(2).Explode();
             
@@ -399,18 +528,26 @@ namespace dxf2fcs
                 var B = lb.EndPoint;
                 var C = lb.StartPoint;
 
-                AppendLineVector3ToFcsVertex($"v{iDrawed}a", A);
-                AppendLineVector3ToFcsVertex($"v{iDrawed}b", B);
-                AppendLineVector3ToFcsVertex($"v{iDrawed}c", C);
+                return DrawArc(A, B, C);
+            }
 
-                sb.AppendLine($"curve {{c{iDrawed}}} arc vertex v{iDrawed}a v{iDrawed}c v{iDrawed}b");
-            } 
+            return -1;
         }
 
-        private void DrawSpline(Spline l)
+        private int DrawArc(Vector3 A, Vector3 B, Vector3 C)
         {
-            DrawCurve(l.PolygonalVertexes(l.ControlPoints.Count * 2));
-          //  DrawPolyline(l.ToPolyline(l.ControlPoints.Count * 1));
+            AppendLineVector3ToFcsVertex($"v{iDrawed}a", A);
+            AppendLineVector3ToFcsVertex($"v{iDrawed}b", B);
+            AppendLineVector3ToFcsVertex($"v{iDrawed}c", C);
+
+            sb.AppendLine($"curve {{c{iDrawed}}} arc vertex v{iDrawed}a v{iDrawed}c v{iDrawed}b");
+
+            return iDrawed;
+        }
+
+        private int DrawSpline(Spline l)
+        {
+            return DrawCurve(l.PolygonalVertexes(l.ControlPoints.Count * 2));
         }
 
         private void DrawHatch(Hatch h)
@@ -421,12 +558,14 @@ namespace dxf2fcs
                 var isBoundaryCurve = !bPath.PathType.HasFlag(HatchBoundaryPathTypeFlags.Outermost);
                 var isOpeningCurve = bPath.PathType.HasFlag(HatchBoundaryPathTypeFlags.Outermost);
 
-                var startI = iDrawed + 1;
+                //var startI = iDrawed + 1;
                 var b = bPath.Edges.Select(e => e.ConvertTo()).ToArray();
+
+                var ids = new List<int>();
 
                 foreach (var path in b)
                 {
-                    EntitiesToFcs(new[] { path });
+                    AddToIds(ids, EntitiesToFcs(new[] { path }));
                 }
 
                 if (isBoundaryCurve)
@@ -438,23 +577,33 @@ namespace dxf2fcs
                         sbArea.Clear();
                     }
 
-                    sbArea.Append($"area {{a{startI}}} boundary curve");
+                    sbArea.Append($"area {{a{iDrawed}}} boundary curve");
                 }
                 else if (isOpeningCurve)
                 {
                     sbArea.Append($" opening curve");
                 }
 
-                for (int i = startI; i <= iDrawed; i++)
+                foreach (var i in ids)
                 {
                     sbArea.Append($" +{{c{i}}}");
                 }
+
+                if (ids.Count == 4)
+                {
+                    sbArea.Append(" mapping Linear");
+                }
+
+                //for (int i = startI; i <= iDrawed; i++)
+                //{
+                //    sbArea.Append($" +{{c{i}}}");
+                //}
             }
 
             sb.AppendLine(sbArea.ToString());
         }
 
-        private void DrawCurve(IEnumerable<Vector3> vectors)
+        private int DrawCurve(IEnumerable<Vector3> vectors)
         {
             sb.AppendLine($"vs{iDrawed} = [");
             foreach (var point in vectors)
@@ -465,6 +614,8 @@ namespace dxf2fcs
             sb.AppendLine($"]");
 
             sb.AppendLine($"curve {{c{iDrawed}}} filletedpoly items (cv(vs{iDrawed}))");
+
+            return iDrawed;
         }
 
         private void DrawCurve(IEnumerable<Vector3Radius> vectors)
@@ -480,12 +631,14 @@ namespace dxf2fcs
             sb.AppendLine($"curve {{c{iDrawed}}} filletedpoly items (cvr(vs{iDrawed})) radius 1");
         }
 
-        private void DrawLine(Line l)
+        private int DrawLine(Line l)
         {
             AppendLineVector3ToFcsVertex($"v{iDrawed}a", l.StartPoint);
             AppendLineVector3ToFcsVertex($"v{iDrawed}b", l.EndPoint);
 
             sb.AppendLine($"curve {{c{iDrawed}}} vertex v{iDrawed}a v{iDrawed}b");
+
+            return iDrawed;
         }
 
         private void AppendLineVector3ToFcsVertex(string name, Vector3 vLocal)
