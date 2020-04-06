@@ -161,6 +161,9 @@ namespace dxf2fcs
                     case Hatch hatch:
                         DrawHatch(hatch);
                         break;
+                    case Face3d f3:
+                        DrawFace3d(f3);
+                        break;
                     default:
                         Console.WriteLine($"Nepodporovaná entita: {item.GetType()}");
                         break;
@@ -278,6 +281,35 @@ namespace dxf2fcs
             }
 
             sb.AppendLine(sbArea.ToString());
+        }
+
+        private void DrawFace3d(Face3d face)
+        {
+            var vertexes = new List<Vector3> {
+                face.FirstVertex,
+                face.SecondVertex,
+                face.ThirdVertex,
+            };
+
+            if (face.FourthVertex != null)
+            {
+                vertexes.Add(face.FourthVertex);
+            }
+
+            var path = new Polyline(vertexes, true);
+
+            var ids = new List<int>();
+            AddToIds(ids, EntitiesToFcs(new[] { path }));
+
+            var i = ++iDrawedArea;
+            sb.Append($"area {{a{i}}} boundary curve");
+
+            foreach (var id in ids)
+            {
+                sb.Append($" +{{c{id}}}");
+            }
+
+            sb.AppendLine();
         }
 
         private List<int> DrawPolyline(LwPolyline l)
