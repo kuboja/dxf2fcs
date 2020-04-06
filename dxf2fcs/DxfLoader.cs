@@ -149,6 +149,9 @@ namespace dxf2fcs
                     case LwPolyline lp:
                         AddToIds(ids, DrawPolyline(lp));
                         break;
+                    case Polyline pl:
+                        AddToIds(ids, DrawPolyline(pl));
+                        break;
                     case Mesh m:
                         DrawMesh(m);
                         break;
@@ -490,6 +493,18 @@ namespace dxf2fcs
         private int DrawSpline(Spline l)
         {
             return DrawCurve(l.PolygonalVertexes(l.ControlPoints.Count * 2));
+        }
+
+        private int DrawPolyline(Polyline l)
+        {
+            var vertexes = l.Vertexes.Select(v => v.Position).ToList();
+
+            if (l.IsClosed)
+            {
+                vertexes.Add(vertexes[0]);
+            }
+
+            return DrawCurve(vertexes);
         }
 
         private int DrawCurve(IEnumerable<Vector3> vectors)
