@@ -161,6 +161,9 @@ namespace dxf2fcs
                     case Hatch hatch:
                         DrawHatch(hatch);
                         break;
+                    case PolyfaceMesh pmesh:
+                        DrawPolyfaceMesh(pmesh);
+                        break;
                     case Face3d f3:
                         DrawFace3d(f3);
                         break;
@@ -281,6 +284,11 @@ namespace dxf2fcs
             }
 
             sb.AppendLine(sbArea.ToString());
+        }
+
+        private void DrawPolyfaceMesh(PolyfaceMesh pm)
+        {
+            EntitiesToFcs(pm.Explode());
         }
 
         private void DrawFace3d(Face3d face)
