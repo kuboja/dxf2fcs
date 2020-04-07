@@ -87,31 +87,34 @@ namespace dxf2fcs
             translations.Clear();
             translations.Push(translation);
 
-            //sb.AppendLine("cv = ar => ar.Select(v => { Vertex = Fcs.Geometry.Vertex3D(v[0], v[1], v[2]), Radius = 0 } )");
-            //sb.AppendLine("cvr = ar => ar.Select(v => { Vertex = Fcs.Geometry.Vertex3D(v[0], v[1], v[2]), Radius = v[3] } )");
-            //sb.AppendLine("v = x,y,z => Fcs.Geometry.Vertex3D(x,y,z)");
-
-            EntitiesToFcs(doc.Inserts);
             EntitiesToFcs(doc.Lines);
-            EntitiesToFcs(doc.Arcs);
+            EntitiesToFcs(doc.Inserts);
+            EntitiesToFcs(doc.Traces);
+            EntitiesToFcs(doc.Solids);
+            EntitiesToFcs(doc.Faces3d);
             EntitiesToFcs(doc.Circles);
             EntitiesToFcs(doc.Ellipses);
-            EntitiesToFcs(doc.Points);
-            EntitiesToFcs(doc.Splines);
-            EntitiesToFcs(doc.Traces);
-            EntitiesToFcs(doc.Texts);
-            EntitiesToFcs(doc.Solids);
+            EntitiesToFcs(doc.Arcs);
             EntitiesToFcs(doc.Shapes);
             EntitiesToFcs(doc.Polylines);
+            EntitiesToFcs(doc.Points);
             EntitiesToFcs(doc.PolyfaceMeshes);
-            EntitiesToFcs(doc.Meshes);
-            EntitiesToFcs(doc.MTexts);
+            EntitiesToFcs(doc.Rays);
+            EntitiesToFcs(doc.Splines);
+            EntitiesToFcs(doc.Dimensions);
             EntitiesToFcs(doc.MLines);
             EntitiesToFcs(doc.LwPolylines);
-            EntitiesToFcs(doc.Faces3d);
+            EntitiesToFcs(doc.Tolerances);
+            EntitiesToFcs(doc.Meshes);
             EntitiesToFcs(doc.Images);
             EntitiesToFcs(doc.Hatches);
-            //EntitiesToFcs(doc.Groups);
+            EntitiesToFcs(doc.MTexts);
+            EntitiesToFcs(doc.Texts);
+            EntitiesToFcs(doc.Leaders);
+            EntitiesToFcs(doc.XLines);
+
+            // not conveted entities:
+            //   viewports, underlays, wipeouts 
 
             var file = new StringBuilder();
 
@@ -323,7 +326,6 @@ namespace dxf2fcs
         private List<int> DrawPolyline(LwPolyline l)
         {
             var ex = l.Explode();
-
             var v = new List<Vector3Middle>();
 
             var i = 0;
